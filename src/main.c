@@ -94,7 +94,25 @@ void inline spiTransfer16(uint16_t data) {
 }
 
 ISR(WATCHDOG_vect ) {
+   // beep();
+}
+
+uint16_t referenceChargeTime = 0;
+
+
+ISR(INT0_vect) {
+    GIMSK &=~ _BV(INT0);
+    uint8_t t = 10;
+    sei();
+    measureCapacitance();
+    referenceChargeTime = chargeTime;
+        
     beep();
+    while(0 == PINB & _BV(PB0)) {
+        //nothing, wait
+    }
+    _delay_ms(10);
+    GIMSK |= _BV(INT0);
 }
 
 void inline initWatchdog() {
@@ -118,6 +136,10 @@ void inline setupGPIO() {
     PORTB &= ~_BV(PB0);
     DDRB |= _BV(PB1);   //nothing
     PORTB &= ~_BV(PB1);
+    
+    PORTB |= _BV(PB2);  //pullup on INT0 pin
+    MCUCR |= _BV(ISC01);    
+    GIMSK |= _BV(INT0); //enable int0 interrupt
 }
 
 void inline setupPowerSaving() {
@@ -135,18 +157,18 @@ void inline sleep() {
     sleep_disable();
 }
 
+
 int main (void) {
     setupPowerSaving();
     setupGPIO();
     sei();
     
-    uint16_t referenceChargeTime = 0;
     _delay_ms(1000);
     
     uint8_t t = 10;
     while(t-- > 0){
         measureCapacitance();
-        if(chargeTime > referenceChargeTime) {
+        if(chargeTime < referenceChargeTime) {
             referenceChargeTime = chargeTime;
         }
     }
@@ -156,10 +178,10 @@ int main (void) {
 
     while(1){
         measureCapacitance();
-        if(chargeTime > referenceChargeTime + 5) {
+        if(chargeTime < referenceChargeTime) {
             chirp(3);
         }
-        //spiTransfer16(chargeTime);
+        spiTransfer16(chargeTime);
         sleep();
     }
 }
