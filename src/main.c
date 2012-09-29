@@ -185,7 +185,7 @@ int main (void) {
 
     while(1){
         uint16_t ct = getCapacitanceRounded();
-        if(ct < 70){//referenceChargeTime) {
+        if(ct < referenceChargeTime) {
             chirp(3);
         }
         //spiTransfer16(referenceChargeTime);
