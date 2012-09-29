@@ -12,7 +12,7 @@ void inline initBuzzer() {
 
     TCCR1A |= _BV(COM1A1);  //set OC1A to low on compare match
     TCCR1A |= _BV(WGM10);   //PWM, Phase Correct, 8-bit 
-    TCCR1B |= _BV(CS10);    //start timer, no prescaling
+    TCCR1B |= _BV(CS11);    //start timer, prescaling clkio/8
 //    PRR |= _BV(PRTIM1);
 }
 
@@ -51,7 +51,7 @@ void measureCapacitance() {
     chargeTime = 0;
     
     PORTA &= ~_BV(PA0);     //discharge capacitor
-    _delay_ms(1);           //one milisecond should be enough?
+    _delay_ms(10);           //one milisecond should be enough?
     
 //    PRR &= ~_BV(PRTIM1);
     TCCR1B = 0;
@@ -75,7 +75,7 @@ void measureCapacitance() {
 }
 
 void inline spiTransfer16(uint16_t data) {
-    PRR &= ~_BV(PRUSI);
+//    PRR &= ~_BV(PRUSI);
     USIDR = data >> 8;
     uint8_t counter = 8;
     PORTA &= ~ _BV(PA3);
@@ -90,14 +90,14 @@ void inline spiTransfer16(uint16_t data) {
         USICR = _BV(USIWM0) | _BV(USITC) | _BV(USICLK);
     }
     PORTA |= _BV(PA3);
-    PRR |= _BV(PRUSI);
+//    PRR |= _BV(PRUSI);
 }
 
 ISR(WATCHDOG_vect ) {
-   // beep();
+   // nothing, just wake up
 }
 
-uint16_t referenceChargeTime = 0;
+uint16_t referenceChargeTime = 65535;
 
 
 ISR(INT0_vect) {
@@ -117,9 +117,10 @@ ISR(INT0_vect) {
 
 void inline initWatchdog() {
     WDTCSR |= _BV(WDCE); 
-    WDTCSR &= ~_BV(WDE);
-    WDTCSR |= _BV(WDIE); 
-    WDTCSR |= _BV(WDP3) | _BV(WDP0); 
+    WDTCSR &= ~_BV(WDE); //interrupt on watchdog overflow
+    WDTCSR |= _BV(WDIE); //enable interrupt
+//    WDTCSR |= _BV(WDP3) | _BV(WDP0); //every 8 sec
+    WDTCSR |= _BV(WDP1) | _BV(WDP2); //every 1 sec
 }
 
 void inline setupGPIO() {
@@ -157,6 +158,15 @@ void inline sleep() {
     sleep_disable();
 }
 
+uint16_t getCapacitanceRounded() {
+    uint8_t c = 32;
+    uint32_t sum = 0;
+    while(c-- > 0) {
+        measureCapacitance();
+        sum += chargeTime;
+    }
+    return (uint16_t) (sum >> 5);
+}
 
 int main (void) {
     setupPowerSaving();
@@ -165,23 +175,21 @@ int main (void) {
     
     _delay_ms(1000);
     
-    uint8_t t = 10;
-    while(t-- > 0){
-        measureCapacitance();
-        if(chargeTime < referenceChargeTime) {
-            referenceChargeTime = chargeTime;
-        }
-    }
+    referenceChargeTime = getCapacitanceRounded();
 
     chirp(2);
+    spiTransfer16(0);
+    spiTransfer16(0);
+    spiTransfer16(referenceChargeTime);
     initWatchdog();
 
     while(1){
-        measureCapacitance();
-        if(chargeTime < referenceChargeTime) {
+        uint16_t ct = getCapacitanceRounded();
+        if(ct < 70){//referenceChargeTime) {
             chirp(3);
         }
-        spiTransfer16(chargeTime);
+        //spiTransfer16(referenceChargeTime);
+        spiTransfer16(ct);
         sleep();
     }
 }
