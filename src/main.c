@@ -5,6 +5,12 @@
 #include <avr/wdt.h>
 #include <avr/sleep.h>
 
+#define USI_SCK PA4
+#define USI_MISO PA5
+#define USI_CS PA3
+#define BUZZER PA6
+#define BUTTON PB2
+
 void inline initBuzzer() {
 //    PRR &= ~_BV(PRTIM1);
     TCCR1A = 0; //reset timer1 configuration
@@ -78,7 +84,7 @@ void inline spiTransfer16(uint16_t data) {
 //    PRR &= ~_BV(PRUSI);
     USIDR = data >> 8;
     uint8_t counter = 8;
-    PORTA &= ~ _BV(PA3);
+    PORTA &= ~ _BV(USI_CS);
     while(counter-- > 0) {
         USICR = _BV(USIWM0) | _BV(USITC);
         USICR = _BV(USIWM0) | _BV(USITC) | _BV(USICLK);
@@ -89,7 +95,7 @@ void inline spiTransfer16(uint16_t data) {
         USICR = _BV(USIWM0) | _BV(USITC);
         USICR = _BV(USIWM0) | _BV(USITC) | _BV(USICLK);
     }
-    PORTA |= _BV(PA3);
+    PORTA |= _BV(USI_CS);
 //    PRR |= _BV(PRUSI);
 }
 
@@ -126,10 +132,10 @@ void inline initWatchdog() {
 void inline setupGPIO() {
     PORTA |= _BV(PA0);  //V_CHARGE
     PORTA &= ~_BV(PA0);                     
-    DDRA |= _BV(PA3) | _BV(PA4) | _BV(PA5); //USI interface
-    PORTA |= _BV(PA3);  //set USI CS to high
-    DDRA |= _BV(PA6);   //piezo buzzer
-    PORTA &= ~_BV(PA6);
+    DDRA |= _BV(USI_CS) | _BV(USI_SCK) | _BV(USI_MISO); //USI interface
+    PORTA |= _BV(USI_CS);  //set USI CS to high
+    DDRA |= _BV(BUZZER);   //piezo buzzer
+    PORTA &= ~_BV(BUZZER);
     DDRA |= _BV(PA7);   //nothing 
     PORTA &= ~_BV(PA7);
     
@@ -138,7 +144,7 @@ void inline setupGPIO() {
     DDRB |= _BV(PB1);   //nothing
     PORTB &= ~_BV(PB1);
     
-    PORTB |= _BV(PB2);  //pullup on INT0 pin
+    PORTB |= _BV(BUTTON);  //pullup on INT0 pin
     MCUCR |= _BV(ISC01);    
     GIMSK |= _BV(INT0); //enable int0 interrupt
 }
@@ -169,6 +175,8 @@ uint16_t getCapacitanceRounded() {
 }
 
 int main (void) {
+    chirp(2);
+
     setupPowerSaving();
     setupGPIO();
     sei();
