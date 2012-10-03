@@ -7,76 +7,38 @@
 
 #define USI_SCK PA4
 #define USI_MISO PA5
-#define USI_CS PA3
-#define BUZZER PA6
+#define USI_CS PA6
+#define BUZZER PA7
 #define BUTTON PB2
 
 void inline initBuzzer() {
-//    PRR &= ~_BV(PRTIM1);
-    TCCR1A = 0; //reset timer1 configuration
-    TCCR1B = 0;
+    TCCR0A = 0; //reset timer1 configuration
+    TCCR0B = 0;
 
-    TCCR1A |= _BV(COM1A1);  //set OC1A to low on compare match
-    TCCR1A |= _BV(WGM10);   //PWM, Phase Correct, 8-bit 
-    TCCR1B |= _BV(CS11);    //start timer, prescaling clkio/8
-//    PRR |= _BV(PRTIM1);
+    TCCR0A |= _BV(COM0B1);  //Clear OC0B on Compare Match when up-counting. Set OC0B on Compare Match when down-counting.
+    TCCR0A |= _BV(WGM00);   //PWM, Phase Correct, 8-bit 
+    TCCR0B |= _BV(CS00);    //start timer
 }
 
-void beep() {
+void inline beep() {
     initBuzzer();
-    OCR1A = 128;
-    _delay_ms(20);
-    TCCR1B = 0;    //stop timer
+    OCR0B = 8;
+    _delay_ms(17);
+    TCCR0B = 0;    //stop timer
+    PORTA &= ~_BV(BUZZER);
 }
 
 void  chirp(uint8_t times) {
+    PRR &= ~_BV(PRTIM0);
     while (times-- > 0) {
         beep();
         _delay_ms(20);
     }
+    PRR |= _BV(PRTIM0);
 }
 
-void inline initComparator() {
-    PRR &= ~_BV(PRADC);                 //start ADC
-    ACSR |= _BV(ACIS0) | _BV(ACIS1);    //Comparator Interrupt on Rising Output Edge.
-    ACSR &= ~_BV(ACIE);                 //disable comparator interrupt
-    ACSR &= ~_BV(ACD);                  //enable comparator
-    ACSR |= _BV(ACIE);                  //enable comparator interrupt
-}
-
-volatile uint16_t chargeTime = 0;
-volatile uint8_t resultReady = 0;
-
-ISR(ANA_COMP_vect) {
-    chargeTime = TCNT1;
-    ACSR &= ~_BV(ACIE); //disable comparator interrupt as comparator goes crazy when we discharge capacitor
-    resultReady = 1;
-}
 
 void measureCapacitance() {
-    chargeTime = 0;
-    
-    PORTA &= ~_BV(PA0);     //discharge capacitor
-    _delay_ms(10);           //one milisecond should be enough?
-    
-//    PRR &= ~_BV(PRTIM1);
-    TCCR1B = 0;
-    TCNT1 = 0;              //set timer to 0
-    TCCR1A = 0;             //reset timer1 configuration
-
-    TCCR1B = _BV(CS10);    //start timer, no prescaling
-    PORTA |= _BV(PA0);      //start charging capacitor
-
-    initComparator();
-        
-    resultReady = 0;
-    while(!resultReady) {
-        //NOTHING 
-    }
-    ACSR |= _BV(ACD);       //disable comparator
-    PORTA &= ~_BV(PA0);     //discharge capacitor
-    TCCR1B = 0;             //stop timer
-//    PRR |= _BV(PRTIM1);
     PRR |= _BV(PRADC);      //shutdown ADC
 }
 
@@ -106,21 +68,6 @@ ISR(WATCHDOG_vect ) {
 uint16_t referenceChargeTime = 65535;
 
 
-ISR(INT0_vect) {
-    GIMSK &=~ _BV(INT0);
-    uint8_t t = 10;
-    sei();
-    measureCapacitance();
-    referenceChargeTime = chargeTime;
-        
-    beep();
-    while(0 == PINB & _BV(PB0)) {
-        //nothing, wait
-    }
-    _delay_ms(10);
-    GIMSK |= _BV(INT0);
-}
-
 void inline initWatchdog() {
     WDTCSR |= _BV(WDCE); 
     WDTCSR &= ~_BV(WDE); //interrupt on watchdog overflow
@@ -130,29 +77,27 @@ void inline initWatchdog() {
 }
 
 void inline setupGPIO() {
-    PORTA |= _BV(PA0);  //V_CHARGE
+    PORTA |= _BV(PA0);  //nothing
     PORTA &= ~_BV(PA0);                     
+    PORTA |= _BV(PA2);  //nothing
+    PORTA &= ~_BV(PA2);                     
+    PORTA |= _BV(PA3);  //nothing
+    PORTA &= ~_BV(PA3);                     
     DDRA |= _BV(USI_CS) | _BV(USI_SCK) | _BV(USI_MISO); //USI interface
     PORTA |= _BV(USI_CS);  //set USI CS to high
     DDRA |= _BV(BUZZER);   //piezo buzzer
     PORTA &= ~_BV(BUZZER);
-    DDRA |= _BV(PA7);   //nothing 
-    PORTA &= ~_BV(PA7);
     
     DDRB |= _BV(PB0);   //nothing
     PORTB &= ~_BV(PB0);
     DDRB |= _BV(PB1);   //nothing
     PORTB &= ~_BV(PB1);
-    
-    PORTB |= _BV(BUTTON);  //pullup on INT0 pin
-    MCUCR |= _BV(ISC01);    
-    GIMSK |= _BV(INT0); //enable int0 interrupt
 }
 
 void inline setupPowerSaving() {
-    DIDR0 |= _BV(ADC1D) | _BV(ADC2D);   //disable digital input buffer on AIN0 and AIN1
-    ADCSRA &= ~_BV(ADEN);               //disable ADC
-    PRR |= _BV(PRTIM0);                 //disable timer0
+    DIDR0 |= _BV(ADC1D);   //disable digital input buffer on AIN0 and AIN1
+    //ADCSRA &= ~_BV(ADEN);               //disable ADC
+    PRR |= _BV(PRTIM1);                 //disable timer1
 }
 
 void inline sleep() {
@@ -164,28 +109,100 @@ void inline sleep() {
     sleep_disable();
 }
 
+void inline sleepWhileADC() {
+    set_sleep_mode(SLEEP_MODE_ADC);
+    sleep_mode();
+}
+
+ISR(ADC_vect) { 
+}
+
+uint16_t getCapacitance() {
+    ADCSRA |= _BV(ADPS0) | _BV(ADPS1) | _BV(ADPS2); //adc clock speed = sysclk/128
+    ADCSRA |= _BV(ADIE);
+    ADMUX |= _BV(MUX0); //select ADC1 as input
+    
+    ADCSRA |= _BV(ADSC); //start conversion
+    
+    sleepWhileADC();
+    
+    uint16_t result = ADCL;
+    result |= ADCH << 8;
+    
+    return result;
+}
+
 uint16_t getCapacitanceRounded() {
-    uint8_t c = 32;
-    uint32_t sum = 0;
-    while(c-- > 0) {
-        measureCapacitance();
-        sum += chargeTime;
-    }
-    return (uint16_t) (sum >> 5);
+    PRR &= ~_BV(PRADC);  //enable ADC in power reduction
+    ADCSRA |= _BV(ADEN);
+    _delay_ms(300);
+
+    getCapacitance();
+    uint16_t result = getCapacitance();
+    
+    ADCSRA &=~ _BV(ADEN);
+    PRR |= _BV(PRADC);
+    return result;
+}
+
+#define LED_K PB0 
+#define LED_A PB1
+
+volatile uint16_t lightCounter = 0;
+
+ISR(PCINT1_vect) {
+    lightCounter = TCNT1;
+}
+
+ISR(TIM1_OVF_vect) {
+    lightCounter = 65535;
+}
+
+uint16_t getLight() {
+    PRR &= ~_BV(PRTIM1);
+    TIMSK1 |= _BV(TOIE1); //enable timer overflow interrupt
+    
+    DDRB |= _BV(LED_A) | _BV(LED_K); //forward bias the LED
+    PORTB &= ~_BV(LED_K);            //flash it to discharge the PN junction capacitance
+    PORTB |= _BV(LED_A);
+
+    PORTB |= _BV(LED_K);            //reverse bias LED to charge capacitance in it
+    PORTB &= ~_BV(LED_A);
+    
+    DDRB &= ~(_BV(LED_A) | _BV(LED_K)); //make pins inputs
+    PORTB &= ~(_BV(LED_A) | _BV(LED_K));//disable pullups
+    
+    TCNT1 = 0;
+    TCCR1A = 0;
+    TCCR1B = _BV(CS11) | _BV(CS10); //start timer1 with prescaler clk/8
+    
+    PCMSK1 |= _BV(PCINT8); //enable pin change interrupt on LED_K
+    GIMSK |= _BV(PCIE1); 
+
+    set_sleep_mode(SLEEP_MODE_IDLE);
+    sleep_mode();
+    
+    TCCR1B = 0;
+    
+    GIMSK &= ~_BV(PCIE1);
+    PCMSK1 &= ~_BV(PCINT8);
+    TIMSK1 &= ~_BV(TOIE1);    
+    PRR |= _BV(PRTIM1);
+    return lightCounter;
 }
 
 int main (void) {
-    chirp(2);
-
+    CLKPR = _BV(CLKPCE);
+    CLKPR = _BV(CLKPS0) | _BV(CLKPS1);
     setupPowerSaving();
     setupGPIO();
     sei();
     
+    chirp(2);
     _delay_ms(1000);
     
     referenceChargeTime = getCapacitanceRounded();
 
-    chirp(2);
     spiTransfer16(0);
     spiTransfer16(0);
     spiTransfer16(referenceChargeTime);
@@ -193,11 +210,11 @@ int main (void) {
 
     while(1){
         uint16_t ct = getCapacitanceRounded();
-        if(ct < referenceChargeTime) {
+        if(ct > referenceChargeTime) {
             chirp(3);
         }
-        //spiTransfer16(referenceChargeTime);
         spiTransfer16(ct);
         sleep();
+        //measureLight();
     }
 }
