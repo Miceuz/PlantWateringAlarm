@@ -1,0 +1,26 @@
+Partlist
+
+Exported from humidity-v2.3.sch at 2012/10/05/ 2:03 PM
+
+EAGLE Version 5.11.0 Copyright (c) 1988-2010 CadSoft
+
+Part     Value            Device           Package      Library        Sheet
+
+B1                        BATTERY          BAT-HLD-001  SparkFun       1
+C2       100nF            CAP0603-CAP      0603-CAP     SparkFun       1
+C3       100nF            CAP0603-CAP      0603-CAP     SparkFun       1
+C4       1uF              CAP0603-CAP      0603-CAP     SparkFun       1
+C5       1uF              CAP0603-CAP      0603-CAP     SparkFun       1
+D2       DIODE-SCHOTTKY_  DIODESOD         SOD-323      SparkFun       1
+IC1      TINY24/44/84-SSU TINY24/44/84-SSU SOIC14       avr-5          1
+JP1      AVR_SPI_PRG_6NS  AVR_SPI_PRG_6NS  2X3-NS       SparkFun       1
+LED1                      LEDCHIPLED_0805  CHIPLED_0805 adafruit       1
+Q1                        MOSFET-N-SOT23   SOT23        Seeed-Discrete 1
+R1       10K              RESISTOR0603-RES 0603-RES     SparkFun       1
+R2       510K             RESISTOR0603-RES 0603-RES     SparkFun       1
+R3       100R             RESISTOR0603-RES 0603-RES     SparkFun       1
+R5       10K              RESISTOR0603-RES 0603-RES     SparkFun       1
+R6       1K               RESISTOR0603-RES 0603-RES     SparkFun       1
+R7       10K              RESISTOR0603-RES 0603-RES     SparkFun       1
+S1                        TAC_SWITCHPTH    TACTILE-PTH  SparkFun       1
+SP1      SPEAKER/PS12     SPEAKER/PS12     PS12         adafruit       1

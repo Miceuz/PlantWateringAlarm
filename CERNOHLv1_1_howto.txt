@@ -1,0 +1,101 @@
+﻿Guide to the CERN OHL v.1.1
+
+This document contains guidelines on how to apply the CERN OHL v.1.1
+to a given hardware design, and on the use of hardware designs
+licensed under the CERN OHL v.1.1.
+
+How to apply the CERN OHL v.1.1 to a hardware design
+
+Pre-requisite:
+
+Authorship/ownership of the design must be clear and undisputed. Only
+the legal owner of the rights in the hardware design may decide under
+what conditions to make it available. If ownership is vested in more
+than one person/entity, there must be an agreement among the owners to
+release the hardware design as open hardware, and under the CERN OHL
+in particular.
+
+The hardware design documentation and files package
+
+Pack all your hardware design documentation files (schematics,
+layout...) as well as the documents listed below in an archive
+file. This will ensure the licensee downloads everything in one go. It
+is best to archive the files using a format everybody can
+open. Schematics and layouts should be included in both source form
+and a format readable by everybody, such as pdf.
+
+The following documents must be distributed together with the hardware
+design documentation:
+
+Document containing the CERN OHL v.1.1 (e.g. LICENSE.PDF) 
+
+This Guide
+
+Text files (plain ASCII file), where information can be added to but
+not removed from, listing:
+
+    Contact point of any Licensor who wishes to receive modified
+    Documentation (see section 3.3.d) (e.g. CONTRIB.TXT);
+
+    Contact point wishing to receive information about manufactured
+    Products (see section 4.2) (e.g. PRODUCT.TXT);
+
+    Modifications made by Licensee (see section 3.3.b)
+    (e.g. CHANGES.TXT)
+
+What to do with the hardware design documentation
+
+Include in the hardware design documentation, for instance as a
+header, the following elements (see section 3.1 CERN OHL v.1.1):
+
+a copyright notice reflecting actual ownership;
+
+a notice that the hardware design documentation is licensed under the
+CERN OHL v.1.1, possibly with a link to http://ohwr.org/cernohl where
+the licence texts are hosted:
+    “Licensed under CERN OHL v.1.1 or later”
+    “Licensed under CERN OHL v.1.1”;
+
+a disclaimer of warranties;
+
+The following is an example of header if CERN is the Licensor:
+Copyright CERN 2011.
+This documentation describes Open Hardware and is licensed under the
+CERN OHL v. 1.1.  You may redistribute and modify this documentation
+under the terms of the CERN OHL v.1.1. (http://ohwr.org/cernohl). This
+documentation is distributed WITHOUT ANY EXPRESS OR IMPLIED WARRANTY,
+INCLUDING OF MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR A
+PARTICULAR PURPOSE. Please see the CERN OHL v.1.1 for applicable
+conditions
+
+Include on the silkscreen:
+	the licence notice: “Licensed under CERN OHL v.1.1”
+    	    Do not include the CERN logo or the copyright notice
+
+How to deal with hardware designs licensed under the CERN OHL v.1.1
+
+Generally speaking, you must always comply with any obligations
+applying to a particular design (detailed in a contract or
+accompanying licence). If you receive hardware designs licensed under
+the CERN OHL v.1.0, the obligations are to:
+
+Keep intact all the copyright and trademark notices that are on the
+hardware design documentation;
+
+Keep intact the references to the CERN OHL v.1.1;
+
+Keep intact the disclaimer of warranties.
+
+If you modify hardware design that you received from someone else that
+is licensed under the CERN OHL v.1.1, you must
+
+Keep intact all the notices referred to above;
+
+Include notices that you have modified the hardware designs, detailing
+what modifications where made (e.g. in a CHANGES.TXT file);
+
+Add the appropriate copyright notice to the modifications that were
+made;
+
+license the modifications under the CERN OHL v.1.1 if you distribute
+them.
