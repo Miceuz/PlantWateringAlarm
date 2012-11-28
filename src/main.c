@@ -211,8 +211,9 @@ int main (void) {
     
     chirp(2);
     ledOn();
-    _delay_ms(1000);
+    _delay_ms(100);
     ledOff();
+    _delay_ms(1000);
   
     referenceChargeTime = getCapacitanceRounded();
 
