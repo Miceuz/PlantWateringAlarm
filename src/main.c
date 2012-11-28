@@ -10,6 +10,9 @@
 #define USI_CS PA6
 #define BUZZER PA7
 #define BUTTON PB2
+#define LED_K PB0 
+#define LED_A PB1
+
 
 void inline initBuzzer() {
     TCCR0A = 0; //reset timer1 configuration
@@ -145,9 +148,6 @@ uint16_t getCapacitanceRounded() {
     return result;
 }
 
-#define LED_K PB0 
-#define LED_A PB1
-
 volatile uint16_t lightCounter = 0;
 
 ISR(PCINT1_vect) {
@@ -191,6 +191,17 @@ uint16_t getLight() {
     return lightCounter;
 }
 
+void ledOn() {
+  DDRB |= _BV(LED_A) | _BV(LED_K); //forward bias the LED
+  PORTB &= ~_BV(LED_K);            //flash it to discharge the PN junction capacitance
+  PORTB |= _BV(LED_A);  
+}
+
+void ledOff() {
+  DDRB &= ~(_BV(LED_A) | _BV(LED_K)); //make pins inputs
+  PORTB &= ~(_BV(LED_A) | _BV(LED_K));//disable pullups
+}
+
 int main (void) {
     CLKPR = _BV(CLKPCE);
     CLKPR = _BV(CLKPS0) | _BV(CLKPS1);
@@ -199,8 +210,10 @@ int main (void) {
     sei();
     
     chirp(2);
+    ledOn();
     _delay_ms(1000);
-    
+    ledOff();
+  
     referenceChargeTime = getCapacitanceRounded();
 
     spiTransfer16(0);
