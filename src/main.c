@@ -31,6 +31,17 @@ void inline beep() {
     PORTA &= ~_BV(BUZZER);
 }
 
+void inline ledOn() {
+  DDRB |= _BV(LED_A) | _BV(LED_K); //forward bias the LED
+  PORTB &= ~_BV(LED_K);            //flash it to discharge the PN junction capacitance
+  PORTB |= _BV(LED_A);  
+}
+
+void inline ledOff() {
+  DDRB &= ~(_BV(LED_A) | _BV(LED_K)); //make pins inputs
+  PORTB &= ~(_BV(LED_A) | _BV(LED_K));//disable pullups
+}
+
 void  chirp(uint8_t times) {
     PRR &= ~_BV(PRTIM0);
     while (times-- > 0) {
@@ -40,13 +51,9 @@ void  chirp(uint8_t times) {
     PRR |= _BV(PRTIM0);
 }
 
-
-void measureCapacitance() {
-    PRR |= _BV(PRADC);      //shutdown ADC
-}
-
 void inline spiTransfer16(uint16_t data) {
-//    PRR &= ~_BV(PRUSI);
+    PRR &= ~_BV(PRUSI);
+    
     USIDR = data >> 8;
     uint8_t counter = 8;
     PORTA &= ~ _BV(USI_CS);
@@ -54,6 +61,7 @@ void inline spiTransfer16(uint16_t data) {
         USICR = _BV(USIWM0) | _BV(USITC);
         USICR = _BV(USIWM0) | _BV(USITC) | _BV(USICLK);
     }
+    
     USIDR = data;
     counter = 8;
     while(counter-- > 0) {
@@ -61,21 +69,20 @@ void inline spiTransfer16(uint16_t data) {
         USICR = _BV(USIWM0) | _BV(USITC) | _BV(USICLK);
     }
     PORTA |= _BV(USI_CS);
-//    PRR |= _BV(PRUSI);
+    PRR |= _BV(PRUSI);
 }
 
 ISR(WATCHDOG_vect ) {
    // nothing, just wake up
 }
 
-uint16_t referenceChargeTime = 65535;
+uint16_t referenceCapacitance = 65535;
 
 
 void inline initWatchdog() {
     WDTCSR |= _BV(WDCE); 
     WDTCSR &= ~_BV(WDE); //interrupt on watchdog overflow
     WDTCSR |= _BV(WDIE); //enable interrupt
-//    WDTCSR |= _BV(WDP3) | _BV(WDP0); //every 8 sec
     WDTCSR |= _BV(WDP1) | _BV(WDP2); //every 1 sec
 }
 
@@ -95,12 +102,17 @@ void inline setupGPIO() {
     PORTB &= ~_BV(PB0);
     DDRB |= _BV(PB1);   //nothing
     PORTB &= ~_BV(PB1);
+    DDRB |= _BV(PB2);   //sqare wave output
+    PORTB &= ~_BV(PB2);
 }
 
 void inline setupPowerSaving() {
     DIDR0 |= _BV(ADC1D);   //disable digital input buffer on AIN0 and AIN1
-    //ADCSRA &= ~_BV(ADEN);               //disable ADC
     PRR |= _BV(PRTIM1);                 //disable timer1
+    PRR |= _BV(PRTIM0);                 //disable timer0
+    ADCSRA &=~ _BV(ADEN);
+    PRR |= _BV(PRADC);
+    PRR |= _BV(PRUSI);
 }
 
 void inline sleep() {
@@ -121,7 +133,7 @@ ISR(ADC_vect) {
 }
 
 uint16_t getCapacitance() {
-    ADCSRA |= _BV(ADPS0) | _BV(ADPS1) | _BV(ADPS2); //adc clock speed = sysclk/128
+    ADCSRA |= _BV(ADPS2); //adc clock speed = sysclk/16
     ADCSRA |= _BV(ADIE);
     ADMUX |= _BV(MUX0); //select ADC1 as input
     
@@ -132,30 +144,54 @@ uint16_t getCapacitance() {
     uint16_t result = ADCL;
     result |= ADCH << 8;
     
-    return result;
+    return 1023 - result;
 }
 
 uint16_t getCapacitanceRounded() {
+    CLKPR = _BV(CLKPCE);
+    CLKPR = _BV(CLKPS1); //clock speed = clk/4 = 2Mhz
+
     PRR &= ~_BV(PRADC);  //enable ADC in power reduction
     ADCSRA |= _BV(ADEN);
-    _delay_ms(300);
+    
+    PRR &= ~_BV(PRTIM0);
+    OCR0A = 0;
+    TCCR0A = _BV(COM0A0) |  //Toggle OC0A on Compare Match
+             _BV(WGM01);    // CTC mode
+    TCCR0B = _BV(CS00);    //start timer
+//    DDRB |= _BV(PB2);
 
+    _delay_ms(1);
     getCapacitance();
+    _delay_ms(1000);
     uint16_t result = getCapacitance();
+    
+    TCCR0B = 0;
+    TCCR0A = 0;
+    
+    PORTB &= ~_BV(PB2);
+    PRR |= _BV(PRTIM0);
     
     ADCSRA &=~ _BV(ADEN);
     PRR |= _BV(PRADC);
+
+    CLKPR = _BV(CLKPCE);
+    CLKPR = _BV(CLKPS1) | _BV(CLKPS0);
     return result;
 }
 
 volatile uint16_t lightCounter = 0;
+volatile uint8_t lightCycleOver = 0;
 
 ISR(PCINT1_vect) {
+    TCCR1B = 0;
     lightCounter = TCNT1;
+    lightCycleOver = 1;
 }
 
 ISR(TIM1_OVF_vect) {
     lightCounter = 65535;
+    lightCycleOver = 1;
 }
 
 uint16_t getLight() {
@@ -165,7 +201,7 @@ uint16_t getLight() {
     DDRB |= _BV(LED_A) | _BV(LED_K); //forward bias the LED
     PORTB &= ~_BV(LED_K);            //flash it to discharge the PN junction capacitance
     PORTB |= _BV(LED_A);
-
+    
     PORTB |= _BV(LED_K);            //reverse bias LED to charge capacitance in it
     PORTB &= ~_BV(LED_A);
     
@@ -174,13 +210,15 @@ uint16_t getLight() {
     
     TCNT1 = 0;
     TCCR1A = 0;
-    TCCR1B = _BV(CS11) | _BV(CS10); //start timer1 with prescaler clk/8
+    TCCR1B = _BV(CS10) | _BV(CS11); //start timer1 with prescaler clk/8
     
     PCMSK1 |= _BV(PCINT8); //enable pin change interrupt on LED_K
     GIMSK |= _BV(PCIE1); 
-
-    set_sleep_mode(SLEEP_MODE_IDLE);
-    sleep_mode();
+    lightCycleOver = 0;
+    while(!lightCycleOver) {
+      set_sleep_mode(SLEEP_MODE_IDLE);
+      sleep_mode();
+    }
     
     TCCR1B = 0;
     
@@ -191,44 +229,124 @@ uint16_t getLight() {
     return lightCounter;
 }
 
-void ledOn() {
-  DDRB |= _BV(LED_A) | _BV(LED_K); //forward bias the LED
-  PORTB &= ~_BV(LED_K);            //flash it to discharge the PN junction capacitance
-  PORTB |= _BV(LED_A);  
+/**
+ * Sets wake up interval to 8s
+ **/
+void inline wakeUpInterval8s() {
+    WDTCSR &= ~_BV(WDP1);
+    WDTCSR &= ~_BV(WDP2);
+    WDTCSR |= _BV(WDP3) | _BV(WDP0); //every 8 sec
 }
 
-void ledOff() {
-  DDRB &= ~(_BV(LED_A) | _BV(LED_K)); //make pins inputs
-  PORTB &= ~(_BV(LED_A) | _BV(LED_K));//disable pullups
+/**
+ * Sets wake up interval to 1s
+ **/
+void inline wakeUpInterval1s() {
+    WDTCSR &= ~_BV(WDP3);
+    WDTCSR &= ~_BV(WDP0);
+    WDTCSR |= _BV(WDP1) | _BV(WDP2); //every 1 sec
 }
+
+void inline chirpIfLight() {
+    getLight();
+    if(lightCounter < 65530) {
+        chirp(3);
+    }
+}
+
+#define INITIAL_THRESHOLD 10
+#define STATE_INITIAL 0
+#define STATE_HIBERNATE 1
+#define STATE_ALERT 2
+#define STATE_VERY_ALERT 3
+#define STATE_PANIC 4
+#define STATE_MEASURE 5
+
+#define SLEEP_TIMES_HIBERNATE 20
+#define SLEEP_TIMES_ALERT 10
+#define SLEEP_TIMES_VERY_ALERT 1
+#define SLEEP_TIMES_PANIC 1
 
 int main (void) {
-    CLKPR = _BV(CLKPCE);
-    CLKPR = _BV(CLKPS0) | _BV(CLKPS1);
-    setupPowerSaving();
     setupGPIO();
+    setupPowerSaving();
+    CLKPR = _BV(CLKPCE);
+    CLKPR = _BV(CLKPS1) | _BV(CLKPS0); //clock speed = clk/8 = 1Mhz
     sei();
     
     chirp(2);
     ledOn();
-    _delay_ms(100);
+    _delay_ms(10);
     ledOff();
-    _delay_ms(1000);
+    _delay_ms(100);
   
-    referenceChargeTime = getCapacitanceRounded();
+    referenceCapacitance = getCapacitanceRounded();
+    getLight();
+    chirp(2);
 
     spiTransfer16(0);
     spiTransfer16(0);
-    spiTransfer16(referenceChargeTime);
+    spiTransfer16(referenceCapacitance);
     initWatchdog();
 
-    while(1){
-        uint16_t ct = getCapacitanceRounded();
-        if(ct > referenceChargeTime) {
-            chirp(3);
+    uint8_t wakeUpCount = 0;
+    uint8_t playedHappy = 0;
+    
+    uint8_t state = STATE_PANIC;
+    int16_t capacitanceDiff = 0;
+    uint8_t maxSleepTimes = 0;
+    
+    while(1) {
+        if(wakeUpCount < maxSleepTimes) {
+            sleep();
+            wakeUpCount++;
+        } else {
+            wakeUpCount = 0;
+            
+            uint16_t currCapacitance = getCapacitanceRounded();
+            capacitanceDiff = referenceCapacitance - currCapacitance;
+            spiTransfer16(currCapacitance);
+            
+            if (capacitanceDiff < -50 && !playedHappy) {
+                chirp(9);
+                _delay_ms(350);
+                chirp(1);
+                _delay_ms(50);
+                chirp(1);
+                playedHappy = 1;
+            }
+            
+            if(capacitanceDiff < -20) {
+                if(STATE_HIBERNATE != state) {
+                    wakeUpInterval8s();
+                }
+                maxSleepTimes = SLEEP_TIMES_HIBERNATE;
+                state = STATE_HIBERNATE;
+            } else {
+                if(capacitanceDiff > -10) {
+                    chirpIfLight();
+                    playedHappy = 0;
+                }
+                if(capacitanceDiff < -5 && capacitanceDiff > -10) {
+                    if(STATE_ALERT != state) {
+                        wakeUpInterval8s();
+                    }
+                    maxSleepTimes = SLEEP_TIMES_ALERT;
+                    state = STATE_ALERT;
+                } else if(capacitanceDiff < 0 && capacitanceDiff > -5) {
+                    if(STATE_VERY_ALERT != state) {
+                        wakeUpInterval8s();
+                    }
+                    state = STATE_VERY_ALERT;
+                    maxSleepTimes = SLEEP_TIMES_VERY_ALERT;
+                } else if(capacitanceDiff >= 0) {
+                    if(STATE_PANIC != state) {
+                        wakeUpInterval1s();
+                    }
+                    state = STATE_PANIC;
+                    maxSleepTimes = SLEEP_TIMES_PANIC;
+                }
+            }
         }
-        spiTransfer16(ct);
-        sleep();
-        //measureLight();
     }
 }

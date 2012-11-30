@@ -9,12 +9,12 @@
 
 DEVICE  = attiny44
 F_CPU   = 1000000	# in Hz
-FUSE_L  = 0xA2# see below for fuse values for particular devices
+FUSE_L  = 0xE2# see below for fuse values for particular devices
 FUSE_H  = 0xDF
 AVRDUDE = avrdude -c usbasp -P usb -p $(DEVICE) # edit this line for your programmer
 
 CFLAGS  = -Iusbdrv -I. -DDEBUG_LEVEL=0  -Os 
-CFLAGS += -ffunction-sections -fdata-sections
+CFLAGS += -ffunction-sections -fdata-sections -save-temps 
 LDFLAGS += -Wl,--gc-sections,--relax
 
 OBJECTS = main.o
