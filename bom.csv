@@ -1,5 +1,5 @@
 IC1;Attiny44A;TINY24/44/84-SSU;SOIC-14;avr-5;DigiKey;ATTINY44A-SSU-ND;0.5595;32.36;http://www.atmel.com/Images/doc8183.pdf;main MCU;"44A is important as we need in ""low power"" variety"
-SG1;;SPEAKER/PS12;PS12;adafruit;DigiKey;445-2525-1-ND;0.3392;19.62;http://www.tdk.co.jp/tefe02/ef532_ps.pdf;sound signal;
+SG1;;SPEAKER/PS12;PS12;adafruit;DigiKey;445-2525-1-ND;0.3392;19.62;http://www.tdk.co.jp/tefe02/ef532_ps.pdf;sound signal;can be replaced with cheaper one
 B1;;BATTERY;BAT-HLD-001;SparkFun;DigiKey;BAT-HLD-001-ND;0.221;12.78;http://www.linxtechnologies.com/resources/diagrams/bat-hld-001.pdf;battery holder;
 _B1;;battery;CR2032;;DigiKey;P189-ND;0.196;11.33;http://panasonic.com/industrial/includes/pdf/Panasonic_Lithium_CR2032_CR2330.pdf;main battery;
 D2;DIODE-SCHOTTKY;DIODESOD-523;SOD-523;microbuilder;DigiKey;RB751S40T1GOSCT-ND;0.099;5.73;http://www.onsemi.com/pub_link/Collateral/RB751S40T1-D.PDF;waveform rectification;should provide as low forward voltage drop as possible at low currents
@@ -7,15 +7,15 @@ S1;;TAC_SWITCHPTH;TACTILE-PTH;SparkFun;DigiKey;679-2428-ND;0.0771;4.46;http://ww
 Q1;;MOSFET-N-SOT23;SOT23;Seeed-Discrete;DigiKey;568-5818-1-ND;0.072;4.16;http://www.nxp.com/documents/data_sheet/2N7002P.pdf;buzzer switching;
 LED1;;LEDCHIPLED_0805;CHIPLED_0805;adafruit;DigiKey;475-1410-1-ND;0.0637;3.68;"http://catalog.osram-os.com/catalogue/catalogue.do;jsessionid=B38D4035738FAE714C474120326E9384?act=downloadFile&favOid=02000002000009ee000100b6";Light level measurement, potentially indication;green is most sensitive to daylight, red - more broad spectrum
 D1;;DIODE-SOD80C (DIODE-);SOD80C;diode;DigiKey;LL4148FSCT-ND;0.0384;2.22;http://www.fairchildsemi.com/ds/LL/LL4148.pdf;battery reverse polarity protection;must be capable of handling at least 20mA continuous current
-C4;1uF;CAP0603-CAP;0603-CAP;SparkFun;DigiKey;399-3118-1-ND;0.019;1.10;;rectifier shoothing cap;
-C5;1uF;CAP0603-CAP;0603-CAP;SparkFun;DigiKey;399-3118-1-ND;0.019;1.10;;power bypass;
+C4;1uF;CAP0603-CAP;0603-CAP;SparkFun;DigiKey;399-3118-1-ND;0.019;1.1;;rectifier smoothing cap;
+C5;1uF;CAP0603-CAP;0603-CAP;SparkFun;DigiKey;399-3118-1-ND;0.019;1.1;;power bypass;
 C2;100nF;CAP0603-CAP;0603-CAP;SparkFun;DigiKey;478-1239-1-ND;0.00454;0.26;;decoupling;
 C3;100nF;CAP0603-CAP;0603-CAP;SparkFun;DigiKey;478-1239-1-ND;0.00454;0.26;;decoupling;
 R2;510K;RESISTOR0603-RES;0603-RES;SparkFun;DigiKey;311-510KGRCT-ND;0.0041;0.24;;low pass filter for rectified signal;
 R3;100R;RESISTOR0603-RES;0603-RES;SparkFun;DigiKey;	311-100GRCT-ND;0.0041;0.24;;"
 LED current limiting";
 R6;1K;RESISTOR0603-RES;0603-RES;SparkFun;DigiKey;311-1.0KGRCT-ND;0.0041;0.24;;buzzer discharge;
-R1;10K;RESISTOR0603-RES;0603-RES;SparkFun;DigiKey;P10KGTR-ND;0.00131;0.08;;low pass filter;might be adjusted depending on capacity of probe
+R1;10K;RESISTOR0603-RES;0603-RES;SparkFun;DigiKey;P10KGTR-ND;0.00131;0.08;;low pass filter;might be adjusted depending on capacity of probe / clo
 R5;10K;RESISTOR0603-RES;0603-RES;SparkFun;DigiKey;P10KGTR-ND;0.00131;0.08;;mosfet gate pulldown;
 R7;10K;RESISTOR0603-RES;0603-RES;SparkFun;DigiKey;P10KGTR-ND;0.00131;0.08;;reset pullup;
 JP1;AVR_SPI_PRG_6NS;AVR_SPI_PRG_6NS;2X3-NS;SparkFun;;;0;;;AVR ISP programming and SPI interface;just a footprint, not populated
