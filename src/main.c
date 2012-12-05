@@ -254,7 +254,6 @@ void inline chirpIfLight() {
     }
 }
 
-#define INITIAL_THRESHOLD 10
 #define STATE_INITIAL 0
 #define STATE_HIBERNATE 1
 #define STATE_ALERT 2
@@ -262,8 +261,8 @@ void inline chirpIfLight() {
 #define STATE_PANIC 4
 #define STATE_MEASURE 5
 
-#define SLEEP_TIMES_HIBERNATE 20
-#define SLEEP_TIMES_ALERT 10
+#define SLEEP_TIMES_HIBERNATE 225
+#define SLEEP_TIMES_ALERT 37
 #define SLEEP_TIMES_VERY_ALERT 1
 #define SLEEP_TIMES_PANIC 1
 
@@ -307,7 +306,7 @@ int main (void) {
             capacitanceDiff = referenceCapacitance - currCapacitance;
             spiTransfer16(currCapacitance);
             
-            if (capacitanceDiff < -50 && !playedHappy) {
+            if (capacitanceDiff < -20 && !playedHappy) {
                 chirp(9);
                 _delay_ms(350);
                 chirp(1);
@@ -315,31 +314,31 @@ int main (void) {
                 chirp(1);
                 playedHappy = 1;
             }
-            
-            if(capacitanceDiff < -20) {
+                        
+            if(capacitanceDiff <= -20) {
                 if(STATE_HIBERNATE != state) {
                     wakeUpInterval8s();
                 }
                 maxSleepTimes = SLEEP_TIMES_HIBERNATE;
                 state = STATE_HIBERNATE;
             } else {
-                if(capacitanceDiff > -10) {
+                if(capacitanceDiff > -20) {
                     chirpIfLight();
                     playedHappy = 0;
                 }
-                if(capacitanceDiff < -5 && capacitanceDiff > -10) {
+                if(capacitanceDiff < -10 && capacitanceDiff > -20) {
                     if(STATE_ALERT != state) {
                         wakeUpInterval8s();
                     }
                     maxSleepTimes = SLEEP_TIMES_ALERT;
                     state = STATE_ALERT;
-                } else if(capacitanceDiff < 0 && capacitanceDiff > -5) {
+                } else if(capacitanceDiff < -5 && capacitanceDiff > -10) {
                     if(STATE_VERY_ALERT != state) {
                         wakeUpInterval8s();
                     }
                     state = STATE_VERY_ALERT;
                     maxSleepTimes = SLEEP_TIMES_VERY_ALERT;
-                } else if(capacitanceDiff >= 0) {
+                } else if(capacitanceDiff >= -5) {
                     if(STATE_PANIC != state) {
                         wakeUpInterval1s();
                     }
