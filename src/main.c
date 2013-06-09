@@ -315,24 +315,24 @@ int main (void) {
                 playedHappy = 1;
             }
                         
-            if(capacitanceDiff <= -20) {
+            if(capacitanceDiff <= -50) {
                 if(STATE_HIBERNATE != state) {
                     wakeUpInterval8s();
                 }
                 maxSleepTimes = SLEEP_TIMES_HIBERNATE;
                 state = STATE_HIBERNATE;
             } else {
-                if(capacitanceDiff > -20) {
+                if(capacitanceDiff > -50) {
                     chirpIfLight();
                     playedHappy = 0;
                 }
-                if(capacitanceDiff < -10 && capacitanceDiff > -20) {
+                if(capacitanceDiff < -20 && capacitanceDiff > -50) {
                     if(STATE_ALERT != state) {
                         wakeUpInterval8s();
                     }
                     maxSleepTimes = SLEEP_TIMES_ALERT;
                     state = STATE_ALERT;
-                } else if(capacitanceDiff < -5 && capacitanceDiff > -10) {
+                } else if(capacitanceDiff < -5 && capacitanceDiff > -20) {
                     if(STATE_VERY_ALERT != state) {
                         wakeUpInterval8s();
                     }
