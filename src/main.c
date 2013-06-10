@@ -4,6 +4,8 @@
 #include <avr/interrupt.h>
 #include <avr/wdt.h>
 #include <avr/sleep.h>
+#include <avr/eeprom.h>
+#include "usiTwiSlave.h"
 
 #define USI_SCK PA4
 #define USI_MISO PA5
@@ -51,27 +53,6 @@ void  chirp(uint8_t times) {
     PRR |= _BV(PRTIM0);
 }
 
-void inline spiTransfer16(uint16_t data) {
-    PRR &= ~_BV(PRUSI);
-    
-    USIDR = data >> 8;
-    uint8_t counter = 8;
-    PORTA &= ~ _BV(USI_CS);
-    while(counter-- > 0) {
-        USICR = _BV(USIWM0) | _BV(USITC);
-        USICR = _BV(USIWM0) | _BV(USITC) | _BV(USICLK);
-    }
-    
-    USIDR = data;
-    counter = 8;
-    while(counter-- > 0) {
-        USICR = _BV(USIWM0) | _BV(USITC);
-        USICR = _BV(USIWM0) | _BV(USITC) | _BV(USICLK);
-    }
-    PORTA |= _BV(USI_CS);
-    PRR |= _BV(PRUSI);
-}
-
 ISR(WATCHDOG_vect ) {
    // nothing, just wake up
 }
@@ -93,8 +74,8 @@ void inline setupGPIO() {
     PORTA &= ~_BV(PA2);                     
     PORTA |= _BV(PA3);  //nothing
     PORTA &= ~_BV(PA3);                     
-    DDRA |= _BV(USI_CS) | _BV(USI_SCK) | _BV(USI_MISO); //USI interface
-    PORTA |= _BV(USI_CS);  //set USI CS to high
+    //DDRA |= _BV(USI_CS) | _BV(USI_SCK) | _BV(USI_MISO); //USI interface
+    //PORTA |= _BV(USI_CS);  //set USI CS to high
     DDRA |= _BV(BUZZER);   //piezo buzzer
     PORTA &= ~_BV(BUZZER);
     
@@ -147,6 +128,18 @@ uint16_t getCapacitance() {
     return 1023 - result;
 }
 
+void startExcitationSignal() {
+	OCR0A = 0;
+	TCCR0A = _BV(COM0A0) |  //Toggle OC0A on Compare Match
+			_BV(WGM01);
+	TCCR0B = _BV(CS00);
+}
+
+void stopExcitationSignal() {
+	TCCR0B = 0;
+	TCCR0A = 0;
+}
+
 uint16_t getCapacitanceRounded() {
     CLKPR = _BV(CLKPCE);
     CLKPR = _BV(CLKPS1); //clock speed = clk/4 = 2Mhz
@@ -155,10 +148,7 @@ uint16_t getCapacitanceRounded() {
     ADCSRA |= _BV(ADEN);
     
     PRR &= ~_BV(PRTIM0);
-    OCR0A = 0;
-    TCCR0A = _BV(COM0A0) |  //Toggle OC0A on Compare Match
-             _BV(WGM01);    // CTC mode
-    TCCR0B = _BV(CS00);    //start timer
+	startExcitationSignal();
 //    DDRB |= _BV(PB2);
 
     _delay_ms(1);
@@ -166,9 +156,7 @@ uint16_t getCapacitanceRounded() {
     _delay_ms(1000);
     uint16_t result = getCapacitance();
     
-    TCCR0B = 0;
-    TCCR0A = 0;
-    
+    stopExcitationSignal();
     PORTB &= ~_BV(PB2);
     PRR |= _BV(PRTIM0);
     
@@ -266,9 +254,42 @@ void inline chirpIfLight() {
 #define SLEEP_TIMES_VERY_ALERT 1
 #define SLEEP_TIMES_PANIC 1
 
+#define MODE_SENSOR 0
+#define MODE_CHIRP 1
+
+uint8_t mode;
+
+inline void loopSensorMode() {
+    PRR &= ~_BV(PRADC);  //enable ADC in power reduction
+    ADCSRA |= _BV(ADEN);
+    PRR &= ~_BV(PRTIM0);
+
+    CLKPR = _BV(CLKPCE);
+	CLKPR = _BV(CLKPS1); //clock speed = clk/4 = 2Mhz
+	startExcitationSignal();
+	_delay_ms(500);
+
+	while(1) {
+		if(usiTwiDataInReceiveBuffer()) {
+			ledOn();
+			uint8_t usiRx = usiTwiReceiveByte();
+			while(usiTwiDataInReceiveBuffer()) {
+				usiTwiReceiveByte();//clean up the receive buffer
+			}
+			if(0 == usiRx) {
+				uint16_t currCapacitance = getCapacitance();
+				usiTwiTransmitByte(currCapacitance >> 8);
+				usiTwiTransmitByte(currCapacitance &0x00FF);
+			}
+			ledOff();
+		}
+	}
+}
+
 int main (void) {
     setupGPIO();
-    setupPowerSaving();
+    sei();
+	usiTwiSlaveInit(0x20);
     CLKPR = _BV(CLKPCE);
     CLKPR = _BV(CLKPS1) | _BV(CLKPS0); //clock speed = clk/8 = 1Mhz
     sei();
@@ -278,14 +299,17 @@ int main (void) {
     _delay_ms(10);
     ledOff();
     _delay_ms(100);
-  
+
     referenceCapacitance = getCapacitanceRounded();
     getLight();
     chirp(2);
 
-    spiTransfer16(0);
-    spiTransfer16(0);
-    spiTransfer16(referenceCapacitance);
+    if(usiTwiDataInReceiveBuffer()){
+		loopSensorMode();
+	}
+
+    setupPowerSaving();
+
     initWatchdog();
 
     uint8_t wakeUpCount = 0;
@@ -294,7 +318,7 @@ int main (void) {
     uint8_t state = STATE_PANIC;
     int16_t capacitanceDiff = 0;
     uint8_t maxSleepTimes = 0;
-    
+
     while(1) {
         if(wakeUpCount < maxSleepTimes) {
             sleep();
