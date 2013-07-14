@@ -259,27 +259,44 @@ void inline chirpIfLight() {
 
 uint8_t mode;
 
-inline void loopSensorMode() {
+void loopSensorMode() {
     PRR &= ~_BV(PRADC);  //enable ADC in power reduction
-    ADCSRA |= _BV(ADEN);
+    ADCSRA = _BV(ADEN) | _BV(ADPS2);
+    ADMUX |= _BV(MUX0); //select ADC1 as input
     PRR &= ~_BV(PRTIM0);
 
     CLKPR = _BV(CLKPCE);
 	CLKPR = _BV(CLKPS1); //clock speed = clk/4 = 2Mhz
 	startExcitationSignal();
 	_delay_ms(500);
+	uint16_t currCapacitance = 0;
 
 	while(1) {
-		if(usiTwiDataInReceiveBuffer()) {
+//	    ADCSRA |= _BV(ADSC); //start conversion
+//	    while (ADCSRA & _BV(ADSC)); //NOTHING
+//	    uint16_t result = ADCL;
+//	    result |= ADCH << 8;
+//	    currCapacitance =  1023 - result;
+
+	    if(usiTwiDataInReceiveBuffer()) {
 			ledOn();
 			uint8_t usiRx = usiTwiReceiveByte();
-			while(usiTwiDataInReceiveBuffer()) {
-				usiTwiReceiveByte();//clean up the receive buffer
-			}
 			if(0 == usiRx) {
-				uint16_t currCapacitance = getCapacitance();
-				usiTwiTransmitByte(currCapacitance >> 8);
+				currCapacitance = getCapacitance();
+			    usiTwiTransmitByte(currCapacitance >> 8);
 				usiTwiTransmitByte(currCapacitance &0x00FF);
+			} else if(0x01 == usiRx) {
+				uint8_t newAddress = usiTwiReceiveByte();
+				if(newAddress > 0 && newAddress < 255) {
+					eeprom_write_byte((uint8_t*)0x01, newAddress);
+				}
+			} else if(0x02 == usiRx) {
+				uint8_t newAddress = eeprom_read_byte((uint8_t*) 0x01);
+				usiTwiTransmitByte(newAddress);
+			} else {
+//				while(usiTwiDataInReceiveBuffer()) {
+//					usiTwiReceiveByte();//clean up the receive buffer
+//				}
 			}
 			ledOff();
 		}
@@ -288,8 +305,12 @@ inline void loopSensorMode() {
 
 int main (void) {
     setupGPIO();
+    uint8_t address = eeprom_read_byte((uint8_t*)0x01);
+    if(0 == address || 255 == address) {
+    	address = 0x20;
+    }
     sei();
-	usiTwiSlaveInit(0x20);
+	usiTwiSlaveInit(address);
     CLKPR = _BV(CLKPCE);
     CLKPR = _BV(CLKPS1) | _BV(CLKPS0); //clock speed = clk/8 = 1Mhz
     sei();
@@ -298,15 +319,18 @@ int main (void) {
     ledOn();
     _delay_ms(10);
     ledOff();
-    _delay_ms(100);
+    _delay_ms(500);
 
-    referenceCapacitance = getCapacitanceRounded();
     getLight();
     chirp(2);
 
     if(usiTwiDataInReceiveBuffer()){
 		loopSensorMode();
 	}
+
+    referenceCapacitance = getCapacitanceRounded();
+
+    USICR = 0;
 
     setupPowerSaving();
 
@@ -328,9 +352,8 @@ int main (void) {
             
             uint16_t currCapacitance = getCapacitanceRounded();
             capacitanceDiff = referenceCapacitance - currCapacitance;
-            spiTransfer16(currCapacitance);
             
-            if (capacitanceDiff < -20 && !playedHappy) {
+            if (capacitanceDiff < -50 && !playedHappy) {
                 chirp(9);
                 _delay_ms(350);
                 chirp(1);
