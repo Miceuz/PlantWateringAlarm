@@ -249,8 +249,8 @@ void inline chirpIfLight() {
 #define STATE_PANIC 4
 #define STATE_MEASURE 5
 
-#define SLEEP_TIMES_HIBERNATE 225
-#define SLEEP_TIMES_ALERT 37
+#define SLEEP_TIMES_HIBERNATE 1//225
+#define SLEEP_TIMES_ALERT 1//37
 #define SLEEP_TIMES_VERY_ALERT 1
 #define SLEEP_TIMES_PANIC 1
 
@@ -364,7 +364,7 @@ int main (void) {
                         
             if(capacitanceDiff <= -50) {
                 if(STATE_HIBERNATE != state) {
-                    wakeUpInterval8s();
+                    wakeUpInterval1s();
                 }
                 maxSleepTimes = SLEEP_TIMES_HIBERNATE;
                 state = STATE_HIBERNATE;
@@ -375,13 +375,13 @@ int main (void) {
                 }
                 if(capacitanceDiff < -20 && capacitanceDiff > -50) {
                     if(STATE_ALERT != state) {
-                        wakeUpInterval8s();
+                        wakeUpInterval1s();
                     }
                     maxSleepTimes = SLEEP_TIMES_ALERT;
                     state = STATE_ALERT;
                 } else if(capacitanceDiff < -5 && capacitanceDiff > -20) {
                     if(STATE_VERY_ALERT != state) {
-                        wakeUpInterval8s();
+                        wakeUpInterval1s();
                     }
                     state = STATE_VERY_ALERT;
                     maxSleepTimes = SLEEP_TIMES_VERY_ALERT;

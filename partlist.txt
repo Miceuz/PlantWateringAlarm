@@ -1,6 +1,6 @@
 Partlist
 
-Exported from humidity-v2.3.sch at 2012/10/05/ 2:03 PM
+Exported from humidity-v2.3.1.sch at 2013/04/15/ 8:11 PM
 
 EAGLE Version 5.11.0 Copyright (c) 1988-2010 CadSoft
 
@@ -11,7 +11,8 @@ C2       100nF            CAP0603-CAP      0603-CAP     SparkFun       1
 C3       100nF            CAP0603-CAP      0603-CAP     SparkFun       1
 C4       1uF              CAP0603-CAP      0603-CAP     SparkFun       1
 C5       1uF              CAP0603-CAP      0603-CAP     SparkFun       1
-D2       DIODE-SCHOTTKY_  DIODESOD         SOD-323      SparkFun       1
+D1                        DIODE-SOD80C     SOD80C       diode          1
+D2       DIODE-SCHOTTKY_  DIODESOD-523     SOD-523      microbuilder   1
 IC1      TINY24/44/84-SSU TINY24/44/84-SSU SOIC14       avr-5          1
 JP1      AVR_SPI_PRG_6NS  AVR_SPI_PRG_6NS  2X3-NS       SparkFun       1
 LED1                      LEDCHIPLED_0805  CHIPLED_0805 adafruit       1
