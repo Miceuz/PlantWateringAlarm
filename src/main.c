@@ -27,8 +27,8 @@ void inline initBuzzer() {
 
 void inline beep() {
     initBuzzer();
-    OCR0B = 8;
-    _delay_ms(17);
+    OCR0B = 48;
+    _delay_ms(42);
     TCCR0B = 0;    //stop timer
     PORTA &= ~_BV(BUZZER);
 }
@@ -48,7 +48,7 @@ void  chirp(uint8_t times) {
     PRR &= ~_BV(PRTIM0);
     while (times-- > 0) {
         beep();
-        _delay_ms(20);
+        _delay_ms(40);
     }
     PRR |= _BV(PRTIM0);
 }
@@ -74,8 +74,6 @@ void inline setupGPIO() {
     PORTA &= ~_BV(PA2);                     
     PORTA |= _BV(PA3);  //nothing
     PORTA &= ~_BV(PA3);                     
-    //DDRA |= _BV(USI_CS) | _BV(USI_SCK) | _BV(USI_MISO); //USI interface
-    //PORTA |= _BV(USI_CS);  //set USI CS to high
     DDRA |= _BV(BUZZER);   //piezo buzzer
     PORTA &= ~_BV(BUZZER);
     
@@ -141,15 +139,11 @@ void stopExcitationSignal() {
 }
 
 uint16_t getCapacitanceRounded() {
-    CLKPR = _BV(CLKPCE);
-    CLKPR = _BV(CLKPS1); //clock speed = clk/4 = 2Mhz
-
     PRR &= ~_BV(PRADC);  //enable ADC in power reduction
     ADCSRA |= _BV(ADEN);
     
     PRR &= ~_BV(PRTIM0);
 	startExcitationSignal();
-//    DDRB |= _BV(PB2);
 
     _delay_ms(1);
     getCapacitance();
@@ -163,8 +157,6 @@ uint16_t getCapacitanceRounded() {
     ADCSRA &=~ _BV(ADEN);
     PRR |= _BV(PRADC);
 
-    CLKPR = _BV(CLKPCE);
-    CLKPR = _BV(CLKPS1) | _BV(CLKPS0);
     return result;
 }
 
@@ -172,7 +164,8 @@ volatile uint16_t lightCounter = 0;
 volatile uint8_t lightCycleOver = 0;
 
 ISR(PCINT1_vect) {
-    TCCR1B = 0;
+    GIMSK &= ~_BV(PCIE1);//disable pin change interrupts
+    TCCR1B = 0;			 //stop timer
     lightCounter = TCNT1;
     lightCycleOver = 1;
 }
@@ -189,7 +182,7 @@ uint16_t getLight() {
     DDRB |= _BV(LED_A) | _BV(LED_K); //forward bias the LED
     PORTB &= ~_BV(LED_K);            //flash it to discharge the PN junction capacitance
     PORTB |= _BV(LED_A);
-    
+
     PORTB |= _BV(LED_K);            //reverse bias LED to charge capacitance in it
     PORTB &= ~_BV(LED_A);
     
@@ -198,7 +191,7 @@ uint16_t getLight() {
     
     TCNT1 = 0;
     TCCR1A = 0;
-    TCCR1B = _BV(CS10) | _BV(CS11); //start timer1 with prescaler clk/8
+    TCCR1B = _BV(CS12);//start timer1 with prescaler clk/256
     
     PCMSK1 |= _BV(PCINT8); //enable pin change interrupt on LED_K
     GIMSK |= _BV(PCIE1); 
@@ -212,11 +205,13 @@ uint16_t getLight() {
     
     GIMSK &= ~_BV(PCIE1);
     PCMSK1 &= ~_BV(PCINT8);
-    TIMSK1 &= ~_BV(TOIE1);    
+    TIMSK1 &= ~_BV(TOIE1);
     PRR |= _BV(PRTIM1);
     return lightCounter;
 }
 
+uint8_t sleepSeconds = 0;
+uint32_t secondsAfterWatering = 0;
 /**
  * Sets wake up interval to 8s
  **/
@@ -224,6 +219,7 @@ void inline wakeUpInterval8s() {
     WDTCSR &= ~_BV(WDP1);
     WDTCSR &= ~_BV(WDP2);
     WDTCSR |= _BV(WDP3) | _BV(WDP0); //every 8 sec
+    sleepSeconds = 8;
 }
 
 /**
@@ -233,6 +229,7 @@ void inline wakeUpInterval1s() {
     WDTCSR &= ~_BV(WDP3);
     WDTCSR &= ~_BV(WDP0);
     WDTCSR |= _BV(WDP1) | _BV(WDP2); //every 1 sec
+    sleepSeconds = 1;
 }
 
 void inline chirpIfLight() {
@@ -265,26 +262,22 @@ void loopSensorMode() {
     ADMUX |= _BV(MUX0); //select ADC1 as input
     PRR &= ~_BV(PRTIM0);
 
-    CLKPR = _BV(CLKPCE);
-	CLKPR = _BV(CLKPS1); //clock speed = clk/4 = 2Mhz
+//    CLKPR = _BV(CLKPCE);
+//	CLKPR = _BV(CLKPS1); //clock speed = clk/4 = 2Mhz
 	startExcitationSignal();
 	_delay_ms(500);
 	uint16_t currCapacitance = 0;
+	uint16_t light = 0;
 
 	while(1) {
-//	    ADCSRA |= _BV(ADSC); //start conversion
-//	    while (ADCSRA & _BV(ADSC)); //NOTHING
-//	    uint16_t result = ADCL;
-//	    result |= ADCH << 8;
-//	    currCapacitance =  1023 - result;
-
 	    if(usiTwiDataInReceiveBuffer()) {
-			ledOn();
 			uint8_t usiRx = usiTwiReceiveByte();
 			if(0 == usiRx) {
-				currCapacitance = getCapacitance();
+//				ledOn();
+				currCapacitance = getCapacitanceRounded();
 			    usiTwiTransmitByte(currCapacitance >> 8);
 				usiTwiTransmitByte(currCapacitance &0x00FF);
+//				ledOff();
 			} else if(0x01 == usiRx) {
 				uint8_t newAddress = usiTwiReceiveByte();
 				if(newAddress > 0 && newAddress < 255) {
@@ -293,12 +286,16 @@ void loopSensorMode() {
 			} else if(0x02 == usiRx) {
 				uint8_t newAddress = eeprom_read_byte((uint8_t*) 0x01);
 				usiTwiTransmitByte(newAddress);
+			} else if(0x03 == usiRx) {
+				light = getLight();
+			} else if(0x04 == usiRx) {
+				usiTwiTransmitByte(light >> 8);
+				usiTwiTransmitByte(light &0x00FF);
 			} else {
 //				while(usiTwiDataInReceiveBuffer()) {
 //					usiTwiReceiveByte();//clean up the receive buffer
 //				}
 			}
-			ledOff();
 		}
 	}
 }
@@ -309,10 +306,10 @@ int main (void) {
     if(0 == address || 255 == address) {
     	address = 0x20;
     }
-    sei();
-	usiTwiSlaveInit(address);
+
+    usiTwiSlaveInit(address);
     CLKPR = _BV(CLKPCE);
-    CLKPR = _BV(CLKPS1) | _BV(CLKPS0); //clock speed = clk/8 = 1Mhz
+    CLKPR = _BV(CLKPS1); //clock speed = clk/4 = 2Mhz
     sei();
     
     chirp(2);
@@ -342,18 +339,22 @@ int main (void) {
     uint8_t state = STATE_PANIC;
     int16_t capacitanceDiff = 0;
     uint8_t maxSleepTimes = 0;
+    uint16_t currCapacitance = 0;
+    uint16_t lastCapacitance = 0;
 
     while(1) {
         if(wakeUpCount < maxSleepTimes) {
             sleep();
             wakeUpCount++;
         } else {
+        	secondsAfterWatering = maxSleepTimes * sleepSeconds;
+
             wakeUpCount = 0;
-            
-            uint16_t currCapacitance = getCapacitanceRounded();
+            lastCapacitance = currCapacitance;
+            currCapacitance = getCapacitanceRounded();
             capacitanceDiff = referenceCapacitance - currCapacitance;
             
-            if (capacitanceDiff < -50 && !playedHappy) {
+            if (!playedHappy && ((int16_t)lastCapacitance - (int16_t)currCapacitance) < -5 && lastCapacitance !=0) {
                 chirp(9);
                 _delay_ms(350);
                 chirp(1);
@@ -362,30 +363,30 @@ int main (void) {
                 playedHappy = 1;
             }
                         
-            if(capacitanceDiff <= -50) {
+            if(capacitanceDiff <= -5) {
                 if(STATE_HIBERNATE != state) {
                     wakeUpInterval8s();
                 }
                 maxSleepTimes = SLEEP_TIMES_HIBERNATE;
                 state = STATE_HIBERNATE;
             } else {
-                if(capacitanceDiff > -50) {
+                if(capacitanceDiff >= -5) {
                     chirpIfLight();
                     playedHappy = 0;
                 }
-                if(capacitanceDiff < -20 && capacitanceDiff > -50) {
+                if(capacitanceDiff > -5 && capacitanceDiff < -2) {
                     if(STATE_ALERT != state) {
                         wakeUpInterval8s();
                     }
                     maxSleepTimes = SLEEP_TIMES_ALERT;
                     state = STATE_ALERT;
-                } else if(capacitanceDiff < -5 && capacitanceDiff > -20) {
+                } else if(capacitanceDiff >= -2 && capacitanceDiff < 0) {
                     if(STATE_VERY_ALERT != state) {
                         wakeUpInterval8s();
                     }
                     state = STATE_VERY_ALERT;
                     maxSleepTimes = SLEEP_TIMES_VERY_ALERT;
-                } else if(capacitanceDiff >= -5) {
+                } else if(capacitanceDiff >= 0) {
                     if(STATE_PANIC != state) {
                         wakeUpInterval1s();
                     }
