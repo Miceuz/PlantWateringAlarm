@@ -15,6 +15,7 @@
 #define LED_K PB0 
 #define LED_A PB1
 
+//------------ peripherals ----------------
 
 void inline initBuzzer() {
     TCCR0A = 0; //reset timer1 configuration
@@ -53,19 +54,7 @@ void  chirp(uint8_t times) {
     PRR |= _BV(PRTIM0);
 }
 
-ISR(WATCHDOG_vect ) {
-   // nothing, just wake up
-}
-
-uint16_t referenceCapacitance = 65535;
-
-
-void inline initWatchdog() {
-    WDTCSR |= _BV(WDCE); 
-    WDTCSR &= ~_BV(WDE); //interrupt on watchdog overflow
-    WDTCSR |= _BV(WDIE); //enable interrupt
-    WDTCSR |= _BV(WDP1) | _BV(WDP2); //every 1 sec
-}
+//------------------- initialization/setup-------------------
 
 void inline setupGPIO() {
     PORTA |= _BV(PA0);  //nothing
@@ -94,6 +83,19 @@ void inline setupPowerSaving() {
     PRR |= _BV(PRUSI);
 }
 
+//--------------- sleep / wakeup routines --------------
+
+void inline initWatchdog() {
+    WDTCSR |= _BV(WDCE);
+    WDTCSR &= ~_BV(WDE); //interrupt on watchdog overflow
+    WDTCSR |= _BV(WDIE); //enable interrupt
+    WDTCSR |= _BV(WDP1) | _BV(WDP2); //every 1 sec
+}
+
+ISR(WATCHDOG_vect ) {
+   // nothing, just wake up
+}
+
 void inline sleep() {
     set_sleep_mode(SLEEP_MODE_PWR_DOWN);
     sleep_enable();
@@ -109,9 +111,24 @@ void inline sleepWhileADC() {
 }
 
 ISR(ADC_vect) { 
+	//nothing, just wake up
 }
 
-uint16_t getCapacitance() {
+// ------------------ capacitance measurement ------------------
+
+void startExcitationSignal() {
+	OCR0A = 0;
+	TCCR0A = _BV(COM0A0) |  //Toggle OC0A on Compare Match
+			_BV(WGM01);
+	TCCR0B = _BV(CS00);
+}
+
+void stopExcitationSignal() {
+	TCCR0B = 0;
+	TCCR0A = 0;
+}
+
+uint16_t getADC1() {
     ADCSRA |= _BV(ADPS2); //adc clock speed = sysclk/16
     ADCSRA |= _BV(ADIE);
     ADMUX |= _BV(MUX0); //select ADC1 as input
@@ -126,19 +143,7 @@ uint16_t getCapacitance() {
     return 1023 - result;
 }
 
-void startExcitationSignal() {
-	OCR0A = 0;
-	TCCR0A = _BV(COM0A0) |  //Toggle OC0A on Compare Match
-			_BV(WGM01);
-	TCCR0B = _BV(CS00);
-}
-
-void stopExcitationSignal() {
-	TCCR0B = 0;
-	TCCR0A = 0;
-}
-
-uint16_t getCapacitanceRounded() {
+uint16_t getCapacitance() {
     PRR &= ~_BV(PRADC);  //enable ADC in power reduction
     ADCSRA |= _BV(ADEN);
     
@@ -146,9 +151,9 @@ uint16_t getCapacitanceRounded() {
 	startExcitationSignal();
 
     _delay_ms(1);
-    getCapacitance();
+    getADC1();
     _delay_ms(1000);
-    uint16_t result = getCapacitance();
+    uint16_t result = getADC1();
     
     stopExcitationSignal();
     PORTB &= ~_BV(PB2);
@@ -159,6 +164,8 @@ uint16_t getCapacitanceRounded() {
 
     return result;
 }
+
+//--------------------- light measurement --------------------
 
 volatile uint16_t lightCounter = 0;
 volatile uint8_t lightCycleOver = 0;
@@ -210,8 +217,70 @@ uint16_t getLight() {
     return lightCounter;
 }
 
+// ----------------- sensor mode loop hack ---------------------
+
+void loopSensorMode() {
+    PRR &= ~_BV(PRADC);  //enable ADC in power reduction
+    ADCSRA = _BV(ADEN) | _BV(ADPS2);
+    ADMUX |= _BV(MUX0); //select ADC1 as input
+    PRR &= ~_BV(PRTIM0);
+
+	startExcitationSignal();
+	_delay_ms(500);
+	uint16_t currCapacitance = 0;
+	uint16_t light = 0;
+
+	while(1) {
+	    if(usiTwiDataInReceiveBuffer()) {
+			uint8_t usiRx = usiTwiReceiveByte();
+			if(0 == usiRx) {
+				ledOn();
+				currCapacitance = getCapacitance();
+			    usiTwiTransmitByte(currCapacitance >> 8);
+				usiTwiTransmitByte(currCapacitance &0x00FF);
+				ledOff();
+			} else if(0x01 == usiRx) {
+				uint8_t newAddress = usiTwiReceiveByte();
+				if(newAddress > 0 && newAddress < 255) {
+					eeprom_write_byte((uint8_t*)0x01, newAddress);
+				}
+			} else if(0x02 == usiRx) {
+				uint8_t newAddress = eeprom_read_byte((uint8_t*) 0x01);
+				usiTwiTransmitByte(newAddress);
+			} else if(0x03 == usiRx) {
+				light = getLight();
+			} else if(0x04 == usiRx) {
+				usiTwiTransmitByte(light >> 8);
+				usiTwiTransmitByte(light &0x00FF);
+			} else {
+//				while(usiTwiDataInReceiveBuffer()) {
+//					usiTwiReceiveByte();//clean up the receive buffer
+//				}
+			}
+		}
+	}
+}
+
+// --------------- chirp FSM states and utilities-----------------
+#define STATE_INITIAL 0
+#define STATE_HIBERNATE 1
+#define STATE_ALERT 2
+#define STATE_VERY_ALERT 3
+#define STATE_PANIC 4
+#define STATE_MEASURE 5
+
+#define SLEEP_TIMES_HIBERNATE 225
+#define SLEEP_TIMES_ALERT 37
+#define SLEEP_TIMES_VERY_ALERT 1
+#define SLEEP_TIMES_PANIC 1
+
+#define MODE_SENSOR 0
+#define MODE_CHIRP 1
+
+uint8_t mode;
 uint8_t sleepSeconds = 0;
 uint32_t secondsAfterWatering = 0;
+
 /**
  * Sets wake up interval to 8s
  **/
@@ -239,77 +308,21 @@ void inline chirpIfLight() {
     }
 }
 
-#define STATE_INITIAL 0
-#define STATE_HIBERNATE 1
-#define STATE_ALERT 2
-#define STATE_VERY_ALERT 3
-#define STATE_PANIC 4
-#define STATE_MEASURE 5
-
-#define SLEEP_TIMES_HIBERNATE 225
-#define SLEEP_TIMES_ALERT 37
-#define SLEEP_TIMES_VERY_ALERT 1
-#define SLEEP_TIMES_PANIC 1
-
-#define MODE_SENSOR 0
-#define MODE_CHIRP 1
-
-uint8_t mode;
-
-void loopSensorMode() {
-    PRR &= ~_BV(PRADC);  //enable ADC in power reduction
-    ADCSRA = _BV(ADEN) | _BV(ADPS2);
-    ADMUX |= _BV(MUX0); //select ADC1 as input
-    PRR &= ~_BV(PRTIM0);
-
-//    CLKPR = _BV(CLKPCE);
-//	CLKPR = _BV(CLKPS1); //clock speed = clk/4 = 2Mhz
-	startExcitationSignal();
-	_delay_ms(500);
-	uint16_t currCapacitance = 0;
-	uint16_t light = 0;
-
-	while(1) {
-	    if(usiTwiDataInReceiveBuffer()) {
-			uint8_t usiRx = usiTwiReceiveByte();
-			if(0 == usiRx) {
-//				ledOn();
-				currCapacitance = getCapacitanceRounded();
-			    usiTwiTransmitByte(currCapacitance >> 8);
-				usiTwiTransmitByte(currCapacitance &0x00FF);
-//				ledOff();
-			} else if(0x01 == usiRx) {
-				uint8_t newAddress = usiTwiReceiveByte();
-				if(newAddress > 0 && newAddress < 255) {
-					eeprom_write_byte((uint8_t*)0x01, newAddress);
-				}
-			} else if(0x02 == usiRx) {
-				uint8_t newAddress = eeprom_read_byte((uint8_t*) 0x01);
-				usiTwiTransmitByte(newAddress);
-			} else if(0x03 == usiRx) {
-				light = getLight();
-			} else if(0x04 == usiRx) {
-				usiTwiTransmitByte(light >> 8);
-				usiTwiTransmitByte(light &0x00FF);
-			} else {
-//				while(usiTwiDataInReceiveBuffer()) {
-//					usiTwiReceiveByte();//clean up the receive buffer
-//				}
-			}
-		}
-	}
-}
+//-----------------------------------------------------------------
 
 int main (void) {
-    setupGPIO();
-    uint8_t address = eeprom_read_byte((uint8_t*)0x01);
+	setupGPIO();
+
+	uint8_t address = eeprom_read_byte((uint8_t*)0x01);
     if(0 == address || 255 == address) {
     	address = 0x20;
     }
 
     usiTwiSlaveInit(address);
+
     CLKPR = _BV(CLKPCE);
     CLKPR = _BV(CLKPS1); //clock speed = clk/4 = 2Mhz
+
     sei();
     
     chirp(2);
@@ -325,7 +338,7 @@ int main (void) {
 		loopSensorMode();
 	}
 
-    referenceCapacitance = getCapacitanceRounded();
+	uint16_t referenceCapacitance = getCapacitance();
 
     USICR = 0;
 
@@ -351,7 +364,7 @@ int main (void) {
 
             wakeUpCount = 0;
             lastCapacitance = currCapacitance;
-            currCapacitance = getCapacitanceRounded();
+            currCapacitance = getCapacitance();
             capacitanceDiff = referenceCapacitance - currCapacitance;
             
             if (!playedHappy && ((int16_t)lastCapacitance - (int16_t)currCapacitance) < -5 && lastCapacitance !=0) {
