@@ -184,23 +184,23 @@ ISR(TIM1_OVF_vect) {
 
 uint16_t getLight() {
     PRR &= ~_BV(PRTIM1);
-    TIMSK1 |= _BV(TOIE1); //enable timer overflow interrupt
+    TIMSK1 |= _BV(TOIE1); 				//enable timer overflow interrupt
     
-    DDRB |= _BV(LED_A) | _BV(LED_K); //forward bias the LED
-    PORTB &= ~_BV(LED_K);            //flash it to discharge the PN junction capacitance
+    DDRB |= _BV(LED_A) | _BV(LED_K); 	//forward bias the LED
+    PORTB &= ~_BV(LED_K);            	//flash it to discharge the PN junction capacitance
     PORTB |= _BV(LED_A);
 
-    PORTB |= _BV(LED_K);            //reverse bias LED to charge capacitance in it
+    PORTB |= _BV(LED_K);            	//reverse bias LED to charge capacitance in it
     PORTB &= ~_BV(LED_A);
     
-    DDRB &= ~(_BV(LED_A) | _BV(LED_K)); //make pins inputs
+    DDRB &= ~_BV(LED_K);                //make Cathode input
     PORTB &= ~(_BV(LED_A) | _BV(LED_K));//disable pullups
     
     TCNT1 = 0;
     TCCR1A = 0;
-    TCCR1B = _BV(CS12);//start timer1 with prescaler clk/256
+    TCCR1B = _BV(CS12);					//start timer1 with prescaler clk/256
     
-    PCMSK1 |= _BV(PCINT8); //enable pin change interrupt on LED_K
+    PCMSK1 |= _BV(PCINT8); 				//enable pin change interrupt on LED_K
     GIMSK |= _BV(PCIE1); 
     lightCycleOver = 0;
     while(!lightCycleOver) {
@@ -251,7 +251,7 @@ void loopSensorMode() {
 				light = getLight();
 			} else if(0x04 == usiRx) {
 				usiTwiTransmitByte(light >> 8);
-				usiTwiTransmitByte(light &0x00FF);
+				usiTwiTransmitByte(light & 0x00FF);
 			} else {
 //				while(usiTwiDataInReceiveBuffer()) {
 //					usiTwiReceiveByte();//clean up the receive buffer
