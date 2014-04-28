@@ -131,7 +131,7 @@ void stopExcitationSignal() {
 uint16_t getADC1() {
     ADCSRA |= _BV(ADPS2); //adc clock speed = sysclk/16
     ADCSRA |= _BV(ADIE);
-    ADMUX |= _BV(MUX0); //select ADC1 as input
+    ADMUX = 0; //select ADC1 as input
     
     ADCSRA |= _BV(ADSC); //start conversion
     
@@ -143,24 +143,44 @@ uint16_t getADC1() {
     return 1023 - result;
 }
 
-uint16_t getCapacitance() {
-    PRR &= ~_BV(PRADC);  //enable ADC in power reduction
-    ADCSRA |= _BV(ADEN);
+uint16_t getADC8() {
+    ADCSRA |= _BV(ADPS2); //adc clock speed = sysclk/16
+    ADCSRA |= _BV(ADIE);
+    ADMUX = 0b10100010; //select ADC8 as input, internal 1.1V Vref
     
-    PRR &= ~_BV(PRTIM0);
-	startExcitationSignal();
+    ADCSRA |= _BV(ADSC); //start conversion
+    
+    sleepWhileADC();
+    
+    uint16_t result = ADCL;
+    result |= ADCH << 8;
+    
+    return result;
+}
 
-    _delay_ms(1);
-    getADC1();
-    _delay_ms(1000);
+
+uint16_t getTemperature() {
+	uint16_t result = getADC8();
+}
+
+uint16_t getCapacitance() {
+//    PRR &= ~_BV(PRADC);  //enable ADC in power reduction
+//    ADCSRA |= _BV(ADEN);
+    
+//    PRR &= ~_BV(PRTIM0);
+//	startExcitationSignal();
+
+    //~ _delay_ms(1);
+    //~ getADC1();
+    //~ _delay_ms(1000);
     uint16_t result = getADC1();
     
-    stopExcitationSignal();
-    PORTB &= ~_BV(PB2);
-    PRR |= _BV(PRTIM0);
-    
-    ADCSRA &=~ _BV(ADEN);
-    PRR |= _BV(PRADC);
+    //~ stopExcitationSignal();
+    //~ PORTB &= ~_BV(PB2);
+    //~ PRR |= _BV(PRTIM0);
+    //~ 
+    //~ ADCSRA &=~ _BV(ADEN);
+    //~ PRR |= _BV(PRADC);
 
     return result;
 }
@@ -198,7 +218,7 @@ uint16_t getLight() {
     
     TCNT1 = 0;
     TCCR1A = 0;
-    TCCR1B = _BV(CS12);					//start timer1 with prescaler clk/256
+    TCCR1B = _BV(CS11) | _BV(CS10);					//start timer1 with prescaler clk/64
     
     PCMSK1 |= _BV(PCINT8); 				//enable pin change interrupt on LED_K
     GIMSK |= _BV(PCIE1); 
@@ -221,15 +241,13 @@ uint16_t getLight() {
 
 void loopSensorMode() {
     PRR &= ~_BV(PRADC);  //enable ADC in power reduction
-    ADCSRA = _BV(ADEN) | _BV(ADPS2);
-    ADMUX |= _BV(MUX0); //select ADC1 as input
     PRR &= ~_BV(PRTIM0);
 
 	startExcitationSignal();
-	_delay_ms(500);
 	uint16_t currCapacitance = 0;
 	uint16_t light = 0;
-
+	uint16_t temperature = 0;
+	
 	while(1) {
 	    if(usiTwiDataInReceiveBuffer()) {
 			uint8_t usiRx = usiTwiReceiveByte();
@@ -241,7 +259,7 @@ void loopSensorMode() {
 				ledOff();
 			} else if(0x01 == usiRx) {
 				uint8_t newAddress = usiTwiReceiveByte();
-				if(newAddress > 0 && newAddress < 255) {
+				if(newAddress > 0 && newAddress < 127) {
 					eeprom_write_byte((uint8_t*)0x01, newAddress);
 				}
 			} else if(0x02 == usiRx) {
@@ -252,6 +270,10 @@ void loopSensorMode() {
 			} else if(0x04 == usiRx) {
 				usiTwiTransmitByte(light >> 8);
 				usiTwiTransmitByte(light & 0x00FF);
+			} else if(0x05 == usiRx) {
+				temperature = getADC8();
+				usiTwiTransmitByte(temperature >> 8);
+				usiTwiTransmitByte(temperature & 0x00FF);
 			} else {
 //				while(usiTwiDataInReceiveBuffer()) {
 //					usiTwiReceiveByte();//clean up the receive buffer
@@ -325,88 +347,9 @@ int main (void) {
 
     sei();
     
-    chirp(2);
     ledOn();
     _delay_ms(10);
     ledOff();
-    _delay_ms(500);
 
-    getLight();
-    chirp(2);
-
-    if(usiTwiDataInReceiveBuffer()){
-		loopSensorMode();
-	}
-
-	uint16_t referenceCapacitance = getCapacitance();
-
-    USICR = 0;
-
-    setupPowerSaving();
-
-    initWatchdog();
-
-    uint8_t wakeUpCount = 0;
-    uint8_t playedHappy = 0;
-    
-    uint8_t state = STATE_PANIC;
-    int16_t capacitanceDiff = 0;
-    uint8_t maxSleepTimes = 0;
-    uint16_t currCapacitance = 0;
-    uint16_t lastCapacitance = 0;
-
-    while(1) {
-        if(wakeUpCount < maxSleepTimes) {
-            sleep();
-            wakeUpCount++;
-        } else {
-        	secondsAfterWatering = maxSleepTimes * sleepSeconds;
-
-            wakeUpCount = 0;
-            lastCapacitance = currCapacitance;
-            currCapacitance = getCapacitance();
-            capacitanceDiff = referenceCapacitance - currCapacitance;
-            
-            if (!playedHappy && ((int16_t)lastCapacitance - (int16_t)currCapacitance) < -5 && lastCapacitance !=0) {
-                chirp(9);
-                _delay_ms(350);
-                chirp(1);
-                _delay_ms(50);
-                chirp(1);
-                playedHappy = 1;
-            }
-                        
-            if(capacitanceDiff <= -5) {
-                if(STATE_HIBERNATE != state) {
-                    wakeUpInterval8s();
-                }
-                maxSleepTimes = SLEEP_TIMES_HIBERNATE;
-                state = STATE_HIBERNATE;
-            } else {
-                if(capacitanceDiff >= -5) {
-                    chirpIfLight();
-                    playedHappy = 0;
-                }
-                if(capacitanceDiff > -5 && capacitanceDiff < -2) {
-                    if(STATE_ALERT != state) {
-                        wakeUpInterval8s();
-                    }
-                    maxSleepTimes = SLEEP_TIMES_ALERT;
-                    state = STATE_ALERT;
-                } else if(capacitanceDiff >= -2 && capacitanceDiff < 0) {
-                    if(STATE_VERY_ALERT != state) {
-                        wakeUpInterval8s();
-                    }
-                    state = STATE_VERY_ALERT;
-                    maxSleepTimes = SLEEP_TIMES_VERY_ALERT;
-                } else if(capacitanceDiff >= 0) {
-                    if(STATE_PANIC != state) {
-                        wakeUpInterval1s();
-                    }
-                    state = STATE_PANIC;
-                    maxSleepTimes = SLEEP_TIMES_PANIC;
-                }
-            }
-        }
-    }
+	loopSensorMode();
 }
