@@ -321,7 +321,6 @@ usiTwiSlaveInit(
   uint8_t ownAddress
 )
 {
-
   flushTwiBuffers( );
 
   slaveAddress = ownAddress;
@@ -476,9 +475,9 @@ ISR( USI_START_VECTOR )
        !( ( PIN_USI & ( 1 << PIN_USI_SDA ) ) )
   );
 
-  if ( !( PIN_USI & ( 1 << PIN_USI_SDA ) ) )
+  if ( !((PIN_USI & (1<<PIN_USI_SDA))  && (PIN_USI & (1<<PIN_USI_SCL))))
   {
-
+    
     // a Stop Condition did not occur
 
     USICR =
