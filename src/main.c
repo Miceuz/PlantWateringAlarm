@@ -134,7 +134,6 @@ ISR(PCINT1_vect) {
     light = lightCounter;
     
     stopLightMeaseurement();
-    ledOn();
 }
 
 ISR(TIM1_OVF_vect) {
@@ -189,10 +188,7 @@ static inline void loopSensorMode() {
     uint16_t temperature = 0;
     
     while(1) {
-    ledOff();
     if(usiTwiDataInReceiveBuffer()) {
-//            ledOn();
-            
             uint8_t usiRx = usiTwiReceiveByte();
 
             if(I2C_GET_CAPACITANCE == usiRx) {
