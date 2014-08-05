@@ -118,7 +118,7 @@ program: flash fuse
 fuse:
 	@[ "$(FUSE_H)" != "" -a "$(FUSE_L)" != "" ] || \
 		{ echo "*** Edit Makefile and choose values for FUSE_L and FUSE_H!"; exit 1; }
-	$(AVRDUDE) -U hfuse:w:$(FUSE_H):m -U lfuse:w:$(FUSE_L):m
+	$(AVRDUDE) -U hfuse:w:$(FUSE_H):m -U lfuse:w:$(FUSE_L):m -B 20.96
 
 # rule for uploading firmware:
 flash: main.hex
