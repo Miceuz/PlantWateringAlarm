@@ -301,10 +301,16 @@ void inline wakeUpInterval1s() {
     sleepSeconds = 1;
 }
 
+uint16_t lightThreshold = 65530;
+
 void inline chirpIfLight() {
     getLight();
-    if(lightCounter < 65530) {
+    if(lightCounter < lightThreshold) {
         chirp(3);
+    } else {
+        ledOn();
+        _delay_ms(10);
+        ledOff();
     }
 }
 
@@ -320,6 +326,8 @@ int main (void) {
 
     usiTwiSlaveInit(address);
 
+    lightThreshold = eeprom_read_word((uint16_t*)0x02);
+
     CLKPR = _BV(CLKPCE);
     CLKPR = _BV(CLKPS1); //clock speed = clk/4 = 2Mhz
 
@@ -332,6 +340,13 @@ int main (void) {
     _delay_ms(500);
 
     getLight();
+    if(65535 == lightThreshold) {
+        getLight();
+        lightThreshold = lightCounter - lightCounter / 20;
+        eeprom_write_word((uint16_t*)0x02, lightThreshold);
+        chirp(1);
+        _delay_ms(500);
+    }
     chirp(2);
 
     if(usiTwiDataInReceiveBuffer()){
