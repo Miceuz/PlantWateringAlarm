@@ -7,6 +7,7 @@
 #include <avr/eeprom.h>
 #include "usiTwiSlave.h"
 
+#define FIRMWARE_VERSION 0x21 //2.1
 
 //------------ peripherals ----------------
 
@@ -179,6 +180,7 @@ static inline uint8_t lightMeasurementInProgress() {
 #define I2C_GET_LIGHT           0x04
 #define I2C_GET_TEMPERATURE     0x05
 #define I2C_RESET               0x06
+#define I2C_GET_VERSION         0x07
 
 #define reset() wdt_enable(WDTO_15MS); while(1) {}
 
@@ -225,6 +227,8 @@ static inline void loopSensorMode() {
                 usiTwiTransmitByte(temperature & 0x00FF);
             } else if(I2C_RESET == usiRx) {
                 reset();
+            } else if(I2C_GET_VERSION == usiRx) {
+                usiTwiTransmitByte(FIRMWARE_VERSION);
             }
         }
     }
