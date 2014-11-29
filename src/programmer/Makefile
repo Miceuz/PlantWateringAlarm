@@ -17,7 +17,7 @@ CFLAGS  = -Iusbdrv -I. -DDEBUG_LEVEL=0  -Os
 CFLAGS += -ffunction-sections -fdata-sections -save-temps 
 LDFLAGS += -Wl,--gc-sections,--relax
 
-OBJECTS = main.o
+OBJECTS = usi_i2c_master.o main.o
 
 COMPILE = avr-gcc -DF_CPU=$(F_CPU) $(CFLAGS) $(LDFLAGS) -mmcu=$(DEVICE)  
 
