@@ -83,13 +83,6 @@ static inline unsigned char ispEnterProgrammingMode() {
     unsigned char check;
     unsigned char retry = 32;
 
-        ledOff();
-        _delay_ms(500);
-        ledOn();
-        _delay_ms(500);
-        ledOff();
-        _delay_ms(1000);
-        
     while (retry--) {
         ispTransmit(0xAC);
         ispTransmit(0x53);
@@ -111,6 +104,8 @@ static inline unsigned char ispEnterProgrammingMode() {
 }
 
 static inline void ispConnect() {
+    ISP_DDR = 0;
+    ISP_OUT = 0;
     /* all ISP pins are inputs before */
     /* now set output pins */
     ISP_DDR |= (1 << ISP_RST) | (1 << ISP_SCK) | (1 << ISP_MOSI);
@@ -168,9 +163,9 @@ static inline void flashFirmware() {
     }
 }
 
-void blink() {
+static inline void blink(unsigned int count) {
         int i = 0;
-        for(i = 0; i < 10; i++) {
+        for(i = 0; i < count; i++) {
                 ledOn();
                 _delay_ms(50);
                 ledOff();
@@ -180,45 +175,49 @@ void blink() {
 
 volatile unsigned char incomming[] = {0x20 << 1 | 0x01, 0x00, 0x00};
 
-void main() {
-        char resetCommand[] = {0x20 << 1, 0x06};
-        char readCapacitanceCommand[] = {0x20 << 1, 0x00};
-        _delay_ms(1000);
-        while(1) {
-                //~ USI_I2C_Master_Start_Transmission(resetCommand, 2);
-                //~ _delay_ms(1000);
-                USI_I2C_Master_Start_Transmission(readCapacitanceCommand, 2);
-                incomming[1] = 5;
-                incomming[2] = 5;
-                _delay_ms(500);
-                USI_I2C_Master_Start_Transmission(incomming, 3);
-                //unsigned int capacitance = ((((unsigned int) incomming[1]) << 8) | incomming[2]);
-                
-                int i;
-                for(i = 0; i < incomming[2]/10; i++) {
-                    ledOn();
-                    _delay_ms(250);
-                    ledOff();
-                    _delay_ms(250);
-                }
-                ledOn();
-                _delay_ms(2000);
-                ledOff();
-                //blink();
-        }
+static inline char testFirmwareVersionPasses() {
+    char getFwVersionCommand[] = {0x20 << 1, 0x07};
+    incomming[1] = 0;
+    USI_I2C_Master_Start_Transmission(getFwVersionCommand, 2);
+    USI_I2C_Master_Start_Transmission(incomming, 2);
+    return 0x21 == incomming[1];
 }
 
-void main2(void) {
+static inline char testCapacitanceWithinLimits() {
+    char readCapacitanceCommand[] = {0x20 << 1, 0x00};
+    USI_I2C_Master_Start_Transmission(readCapacitanceCommand, 2);
+    incomming[1] = 0;
+    incomming[2] = 0;
+    _delay_ms(1);
+    USI_I2C_Master_Start_Transmission(incomming, 3);
+    unsigned int capacitance = ((((unsigned int) incomming[1]) << 8) | incomming[2]);
+    return capacitance > 180 && capacitance < 245;
+} 
+
+static inline void blinkError() {
+    ledOn();
+    _delay_ms(2000);
+    ledOff();
+}
+
+static inline unsigned char testsPass() {
+    return testFirmwareVersionPasses()
+           && testCapacitanceWithinLimits();
+}
+
+void main(void) {
         clockInit();
         
         while(1) {
                 ispConnect();
                 
+                _delay_ms(100);
                 while(ispEnterProgrammingMode()) {
-                        _delay_ms(500);
-                        ledOn();
-                        _delay_ms(500);
-                        ledOff();
+                    ispConnect();
+                    _delay_ms(500);
+                    ledOn();
+                    _delay_ms(500);
+                    ledOff();
                 }
                 
                 setFuses(0xE2, 0xD6);
@@ -227,5 +226,16 @@ void main2(void) {
                 ledOff();
 
                 ISP_OUT |= (1 << ISP_RST); //release reset
+                _delay_ms(100);
+                
+                ISP_DDR = 0;
+                ISP_OUT = 0;
+                
+                if(!testsPass()) {
+                    blinkError();
+                } else {
+                    blink(20);
+                }
+                USICR = 0;
         }
 }
