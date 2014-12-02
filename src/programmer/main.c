@@ -82,12 +82,6 @@ static inline unsigned char ispEnterProgrammingMode() {
 	unsigned char check;
 	unsigned char retry = 32;
 
-        ledOff();
-        _delay_ms(500);
-        ledOn();
-        _delay_ms(500);
-        ledOff();
-        _delay_ms(1000);
         
 	while (retry--) {
 		ispTransmit(0xAC);
