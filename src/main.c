@@ -199,7 +199,7 @@ static inline void loopSensorMode() {
                 usiTwiTransmitByte(currCapacitance &0x00FF);
             } else if(I2C_SET_ADDRESS == usiRx) {
                 uint8_t newAddress = usiTwiReceiveByte();
-                if(newAddress > 0 && newAddress < 127) {
+                if(newAddress > 1 && newAddress < 127) {
                     eeprom_write_byte((uint8_t*)0x01, newAddress);
                 }
 
