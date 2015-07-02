@@ -341,11 +341,11 @@ int main (void) {
 
     getLight();
     if(65535 == lightThreshold) {
-        getLight();
+//        getLight();
         lightThreshold = lightCounter - lightCounter / 10;
         eeprom_write_word((uint16_t*)0x02, lightThreshold);
         chirp(1);
-        _delay_ms(500);
+        _delay_ms(300);
     }
     chirp(2);
 
