@@ -1,0 +1,22 @@
+### Module positions - created on Mon 22 Feb 2016 12:27:50 PM EET ###
+### Printed by Pcbnew version kicad 0.201602211417+6576~42~ubuntu14.04.1-product
+## Unit = mm, Angle = deg.
+## Side : top
+# Ref     Val               Package                PosX       PosY       Rot  Side
+C2        1uF               0603-CAP           107.2261  -107.5411  180.0000  top
+C3        1uF               0603-CAP           105.3211  -103.7311  180.0000  top
+C4        1uF               0603-CAP           120.5611   -99.2861    0.0000  top
+C5        1uF               0603-CAP            92.6211  -100.5561    0.0000  top
+D1                          DO214AC             97.3201  -110.0811    0.0000  top
+D2        DIODE-SCHOTTKY_   SOD-523            120.5611  -101.1911   90.0000  top
+IC1       TINY24/44/84-SSU  SOIC14             112.9411  -105.0011    0.0000  top
+LED1                        CHIPLED_0805       107.2261  -110.0811  270.0000  top
+Q1                          SOT23               92.6211  -108.8111  180.0000  top
+R1        10K               0603-RES           120.5611  -104.3661  180.0000  top
+R2        510K              0603-RES           110.4011   -99.2861  180.0000  top
+R3        100R              0603-RES           103.0351  -110.0811  180.0000  top
+R5        10K               0603-RES            92.6211  -105.6361    0.0000  top
+R6        10K               0603-RES            87.5411  -105.0011    0.0000  top
+R7        10K               0603-RES            87.9221   -99.7941    0.0000  top
+SW1       SPST_TACTFSMJSMA  FSMJSMA             82.4611  -105.0011   90.0000  top
+## End
