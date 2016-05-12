@@ -1,4 +1,4 @@
-IC1;Attiny44A;TINY24/44/84-SSU;SOIC-14;avr-5;DigiKey;ATTINY44A-SSU-ND;0.5595;32.36;http://www.atmel.com/Images/doc8183.pdf;main MCU;"44A is important as we need in ""low power"" variety"
+IC1;Attiny44A;TINY24/44/84-SSU;SOIC-14;avr-5;DigiKey;ATTINY44A-SSU-ND;0.5595;32.36;http://www.atmel.com/Images/doc8183.pdf;main MCU;"44A is important as we need in low power variety"
 SG1;;SPEAKER/PS12;PS12;adafruit;DigiKey;445-2525-1-ND;0.3392;19.62;http://www.tdk.co.jp/tefe02/ef532_ps.pdf;sound signal;can be replaced with cheaper one
 B1;;BATTERY;BAT-HLD-001;SparkFun;DigiKey;BAT-HLD-001-ND;0.221;12.78;http://www.linxtechnologies.com/resources/diagrams/bat-hld-001.pdf;battery holder;
 _B1;;battery;CR2032;;DigiKey;P189-ND;0.196;11.33;http://panasonic.com/industrial/includes/pdf/Panasonic_Lithium_CR2032_CR2330.pdf;main battery;
