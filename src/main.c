@@ -26,7 +26,7 @@ void inline initBuzzer() {
     TCCR0B |= _BV(CS00);    //start timer
 }
 
-void inline beep() {
+void inline static beep() {
     initBuzzer();
     OCR0B = 48;
     _delay_ms(42);
@@ -45,7 +45,7 @@ void inline ledOff() {
   PORTB &= ~(_BV(LED_A) | _BV(LED_K));//disable pullups
 }
 
-void  chirp(uint8_t times) {
+void static chirp(uint8_t times) {
     PRR &= ~_BV(PRTIM0);
     while (times-- > 0) {
         beep();
@@ -303,7 +303,7 @@ void inline wakeUpInterval1s() {
 
 uint16_t lightThreshold = 65530;
 
-void inline chirpIfLight() {
+void inline static chirpIfLight() {
     getLight();
     if(lightCounter < lightThreshold) {
         chirp(3);
