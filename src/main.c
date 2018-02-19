@@ -98,9 +98,10 @@ ISR(WATCHDOG_vect ) {
 
 void inline sleep() {
     set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+    cli();
     sleep_enable();
-    MCUCR |= _BV(BODS) | _BV(BODSE);    //disable brownout detection during sleep
-    MCUCR &=~ _BV(BODSE);
+    sleep_bod_disable();
+    sei();
     sleep_cpu();
     sleep_disable();
 }
@@ -126,12 +127,13 @@ void startExcitationSignal() {
 void stopExcitationSignal() {
 	TCCR0B = 0;
 	TCCR0A = 0;
+    PORTB &= ~_BV(PB2);
 }
 
 uint16_t getADC1() {
     ADCSRA |= _BV(ADPS2); //adc clock speed = sysclk/16
     ADCSRA |= _BV(ADIE);
-    ADMUX |= _BV(MUX0); //select ADC1 as input
+    ADMUX == _BV(MUX0); //select ADC1 as input
     
     ADCSRA |= _BV(ADSC); //start conversion
     
@@ -141,6 +143,22 @@ uint16_t getADC1() {
     result |= ADCH << 8;
     
     return 1023 - result;
+}
+
+uint16_t getRefVoltage() {
+    ADCSRA |= _BV(ADPS2); //adc clock speed = sysclk/16
+    ADCSRA |= _BV(ADIE);
+    ADMUX = 0b00100001; //select 1,1V reference as input
+    
+    ADCSRA |= _BV(ADSC); //start conversion
+    
+    sleepWhileADC();
+    
+    uint16_t result = ADCL;
+    result |= ADCH << 8;
+    
+
+    return result;//reference * 1023 / result;
 }
 
 uint16_t getCapacitance() {
@@ -316,6 +334,8 @@ void inline static chirpIfLight() {
 
 //-----------------------------------------------------------------
 
+uint8_t isBatteryEmpty = 0;
+
 int main (void) {
 	setupGPIO();
 
@@ -326,22 +346,55 @@ int main (void) {
 
     usiTwiSlaveInit(address);
 
+    cli();
     lightThreshold = eeprom_read_word((uint16_t*)0x02);
+
+    uint16_t battFullLSB = eeprom_read_word((uint16_t*) 0x04);  
+    sei();
+
+    PRR &= ~_BV(PRADC);  //enable ADC in power reduction
+    ADCSRA |= _BV(ADEN);
+
+    sei();
+    if(65535 == battFullLSB) {
+        ledOn();
+        _delay_ms(8000);
+        battFullLSB = getRefVoltage();//discard the first reading
+        _delay_ms(4000);
+        battFullLSB = getRefVoltage();
+        ledOff();
+        cli();
+        eeprom_write_word((uint16_t*)0x04, battFullLSB);
+        sei();
+    } else {
+        getRefVoltage();
+        _delay_ms(4000);
+    }
+
+
+   
+    uint16_t refVoltageLSB = getRefVoltage();
+
+    ledOn();
+    _delay_ms(10);
+    
+    isBatteryEmpty = refVoltageLSB > battFullLSB && (refVoltageLSB - battFullLSB) > 36;
+
+    if(isBatteryEmpty) {
+        while(1) {
+
+        }
+    }
 
     CLKPR = _BV(CLKPCE);
     CLKPR = _BV(CLKPS1); //clock speed = clk/4 = 2Mhz
-
-    sei();
-    
-    chirp(2);
-    ledOn();
-    _delay_ms(10);
+    chirp(2);    
     ledOff();
     _delay_ms(500);
 
     getLight();
     if(65535 == lightThreshold) {
-//        getLight();
+        // getLight();
         lightThreshold = lightCounter - lightCounter / 10;
         eeprom_write_word((uint16_t*)0x02, lightThreshold);
         chirp(1);
@@ -370,7 +423,9 @@ int main (void) {
     uint16_t currCapacitance = 0;
     uint16_t lastCapacitance = 0;
 
+
     while(1) {
+
         if(wakeUpCount < maxSleepTimes) {
             sleep();
             wakeUpCount++;
@@ -381,7 +436,8 @@ int main (void) {
             lastCapacitance = currCapacitance;
             currCapacitance = getCapacitance();
             capacitanceDiff = referenceCapacitance - currCapacitance;
-            
+
+           
             if (!playedHappy && ((int16_t)lastCapacitance - (int16_t)currCapacitance) < -5 && lastCapacitance !=0) {
                 chirp(9);
                 _delay_ms(350);
@@ -402,6 +458,7 @@ int main (void) {
                     chirpIfLight();
                     playedHappy = 0;
                 }
+
                 if(capacitanceDiff > -5 && capacitanceDiff < -2) {
                     if(STATE_ALERT != state) {
                         wakeUpInterval8s();

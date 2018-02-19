@@ -10,7 +10,7 @@
 DEVICE  = attiny44
 F_CPU   = 1000000	# in Hz
 FUSE_L  = 0xE2# see below for fuse values for particular devices
-FUSE_H  = 0xD6
+FUSE_H  = 0xDE
 AVRDUDE = avrdude -c usbasp -P usb -p $(DEVICE) # edit this line for your programmer
 
 CFLAGS  = -Iusbdrv -I. -DDEBUG_LEVEL=0  -Os 
@@ -122,7 +122,7 @@ fuse:
 
 # rule for uploading firmware:
 flash: main.hex
-	$(AVRDUDE) -U flash:w:main.hex:i
+	$(AVRDUDE) -e -U flash:w:main.hex:i
 
 # rule for deleting dependent files (those which can be built by Make):
 clean:
