@@ -18,21 +18,22 @@
 //------------ peripherals ----------------
 
 void inline initBuzzer() {
-    TCCR0A = 0; //reset timer1 configuration
-    TCCR0B = 0;
-
-    TCCR0A |= _BV(COM0B1);  //Clear OC0B on Compare Match when up-counting. Set OC0B on Compare Match when down-counting.
+    TCCR0A = _BV(COM0B1);  //Clear OC0B on Compare Match when up-counting. Set OC0B on Compare Match when down-counting.
     TCCR0A |= _BV(WGM00);   //PWM, Phase Correct, 8-bit 
-    TCCR0B |= _BV(CS00);    //start timer
+    TCCR0B = _BV(CS00);    //start timer
 }
 
 void inline static beep() {
     initBuzzer();
     OCR0B = 48;
     _delay_ms(42);
-    TCCR0B = 0;    //stop timer
+    TCCR0B = 0; //stop timer
+    TCCR0A = 0; //reset timer1 configuration
     PORTA &= ~_BV(BUZZER);
-}
+    TCNT0 = 0;
+    TIFR0 = _BV(OCF0B) | _BV(OCF0A);
+}   
+ 
 
 void inline ledOn() {
   DDRB |= _BV(LED_A) | _BV(LED_K); //forward bias the LED
@@ -118,27 +119,31 @@ ISR(ADC_vect) {
 // ------------------ capacitance measurement ------------------
 
 void startExcitationSignal() {
+    PORTB &= ~_BV(PB2);
+    //TIFR0 = _BV(OCF0B) | _BV(OCF0A);
 	OCR0A = 0;
 	TCCR0A = _BV(COM0A0) |  //Toggle OC0A on Compare Match
 			_BV(WGM01);
+    TCNT0 = 254;
 	TCCR0B = _BV(CS00);
 }
 
 void stopExcitationSignal() {
-	TCCR0B = 0;
-	TCCR0A = 0;
+    TCCR0B = 0;
+    TCCR0A = 0;
     PORTB &= ~_BV(PB2);
 }
 
 uint16_t getADC1() {
     ADCSRA |= _BV(ADPS2); //adc clock speed = sysclk/16
     ADCSRA |= _BV(ADIE);
-    ADMUX == _BV(MUX0); //select ADC1 as input
+    ADMUX == 1; //select ADC1 as input
     
     ADCSRA |= _BV(ADSC); //start conversion
     
-    sleepWhileADC();
-    
+    // sleepWhileADC();
+    loop_until_bit_is_clear(ADCSRA, ADSC);
+
     uint16_t result = ADCL;
     result |= ADCH << 8;
     
@@ -170,8 +175,10 @@ uint16_t getCapacitance() {
 
     _delay_ms(1);
     getADC1();
-    _delay_ms(1000);
+    PORTA |= _BV(PA4);
+    _delay_ms(100);
     uint16_t result = getADC1();
+    PORTA &= ~_BV(PA4);
     
     stopExcitationSignal();
     PORTB &= ~_BV(PB2);
@@ -179,6 +186,7 @@ uint16_t getCapacitance() {
     
     ADCSRA &=~ _BV(ADEN);
     PRR |= _BV(PRADC);
+
 
     return result;
 }
@@ -349,42 +357,40 @@ int main (void) {
     cli();
     lightThreshold = eeprom_read_word((uint16_t*)0x02);
 
-    uint16_t battFullLSB = eeprom_read_word((uint16_t*) 0x04);  
+//    uint16_t battFullLSB = eeprom_read_word((uint16_t*) 0x04);  
     sei();
 
     PRR &= ~_BV(PRADC);  //enable ADC in power reduction
     ADCSRA |= _BV(ADEN);
 
     sei();
-    if(65535 == battFullLSB) {
-        ledOn();
-        _delay_ms(8000);
-        battFullLSB = getRefVoltage();//discard the first reading
-        _delay_ms(4000);
-        battFullLSB = getRefVoltage();
-        ledOff();
-        cli();
-        eeprom_write_word((uint16_t*)0x04, battFullLSB);
-        sei();
-    } else {
-        getRefVoltage();
-        _delay_ms(4000);
-    }
+    // if(65535 == battFullLSB) {
+    //     ledOn();
+    //     _delay_ms(8000);
+    //     battFullLSB = getRefVoltage();//discard the first reading
+    //     _delay_ms(4000);
+    //     battFullLSB = getRefVoltage();
+    //     ledOff();
+    //     cli();
+    //     eeprom_write_word((uint16_t*)0x04, battFullLSB);
+    //     sei();
+    // } else {
+    //     getRefVoltage();
+    //     _delay_ms(4000);
+    // }
 
-
-   
-    uint16_t refVoltageLSB = getRefVoltage();
+    // uint16_t refVoltageLSB = getRefVoltage();
 
     ledOn();
     _delay_ms(10);
     
-    isBatteryEmpty = refVoltageLSB > battFullLSB && (refVoltageLSB - battFullLSB) > 36;
+    // isBatteryEmpty = refVoltageLSB > battFullLSB && (refVoltageLSB - battFullLSB) > 36;
 
-    if(isBatteryEmpty) {
-        while(1) {
+    // if(isBatteryEmpty) {
+    //     while(1) {
 
-        }
-    }
+    //     }
+    // }
 
     CLKPR = _BV(CLKPCE);
     CLKPR = _BV(CLKPS1); //clock speed = clk/4 = 2Mhz
@@ -401,6 +407,7 @@ int main (void) {
         _delay_ms(300);
     }
     chirp(2);
+   _delay_ms(500);
 
     if(usiTwiDataInReceiveBuffer()){
 		loopSensorMode();
@@ -424,6 +431,8 @@ int main (void) {
     uint16_t lastCapacitance = 0;
 
 
+    DDRA |= _BV(PA4);
+    PORTA &= ~_BV(PA4);
     while(1) {
 
         if(wakeUpCount < maxSleepTimes) {
@@ -455,8 +464,8 @@ int main (void) {
                 state = STATE_HIBERNATE;
             } else {
                 if(capacitanceDiff >= -5) {
-                    chirpIfLight();
-                    playedHappy = 0;
+                   chirpIfLight();
+                   playedHappy = 0;
                 }
 
                 if(capacitanceDiff > -5 && capacitanceDiff < -2) {
