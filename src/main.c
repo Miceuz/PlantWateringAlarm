@@ -135,8 +135,9 @@ uint16_t getADC1() {
     
     ADCSRA |= _BV(ADSC); //start conversion
     
-    sleepWhileADC();
-    
+    // sleepWhileADC();
+    loop_until_bit_is_clear(ADCSRA, ADSC);
+
     uint16_t result = ADCL;
     result |= ADCH << 8;
     
@@ -150,9 +151,9 @@ uint16_t getCapacitance() {
     PRR &= ~_BV(PRTIM0);
 	startExcitationSignal();
 
-    _delay_ms(1);
+    // _delay_ms(1);
     getADC1();
-    _delay_ms(1000);
+    // _delay_ms(1);
     uint16_t result = getADC1();
     
     stopExcitationSignal();
