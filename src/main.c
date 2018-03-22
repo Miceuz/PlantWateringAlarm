@@ -315,6 +315,10 @@ void inline static chirpIfLight() {
     }
 }
 
+uint8_t isLightNotCalibrated() {
+    return 65535 == lightThreshold;
+}
+
 //-----------------------------------------------------------------
 
 int main (void) {
@@ -334,14 +338,13 @@ int main (void) {
 
     sei();
     
-    chirp(2);
     ledOn();
-    _delay_ms(10);
+    chirp(2);
     ledOff();
     _delay_ms(500);
 
     getLight();
-    if(65535 == lightThreshold) {
+    if(isLightNotCalibrated()) {
 //        getLight();
         lightThreshold = lightCounter - lightCounter / 10;
         eeprom_write_word((uint16_t*)0x02, lightThreshold);
