@@ -137,8 +137,9 @@ uint16_t getADC1() {
     
     ADCSRA |= _BV(ADSC); //start conversion
     
-    sleepWhileADC();
-    
+    // sleepWhileADC();
+    loop_until_bit_is_clear(ADCSRA, ADSC);
+
     uint16_t result = ADCL;
     result |= ADCH << 8;
     
@@ -168,9 +169,9 @@ uint16_t getCapacitance() {
     PRR &= ~_BV(PRTIM0);
 	startExcitationSignal();
 
-    _delay_ms(1);
+    // _delay_ms(1);
     getADC1();
-    _delay_ms(1000);
+    // _delay_ms(1);
     uint16_t result = getADC1();
     
     stopExcitationSignal();
@@ -332,9 +333,12 @@ void inline static chirpIfLight() {
     }
 }
 
-//-----------------------------------------------------------------
+uint8_t isLightNotCalibrated() {
+    return 65535 == lightThreshold;
+}
 
 uint8_t isBatteryEmpty = 0;
+//-----------------------------------------------------------------
 
 int main (void) {
 	setupGPIO();
@@ -354,6 +358,9 @@ int main (void) {
 
     PRR &= ~_BV(PRADC);  //enable ADC in power reduction
     ADCSRA |= _BV(ADEN);
+
+//    CLKPR = _BV(CLKPCE);
+//    CLKPR = _BV(CLKPS1); //clock speed = clk/4 = 2Mhz
 
     sei();
     if(65535 == battFullLSB) {
@@ -375,6 +382,9 @@ int main (void) {
    
     uint16_t refVoltageLSB = getRefVoltage();
 
+    
+    ledOn();
+    chirp(2);
     ledOn();
     _delay_ms(10);
     
@@ -393,8 +403,8 @@ int main (void) {
     _delay_ms(500);
 
     getLight();
-    if(65535 == lightThreshold) {
-        // getLight();
+    if(isLightNotCalibrated()) {
+//        getLight();
         lightThreshold = lightCounter - lightCounter / 10;
         eeprom_write_word((uint16_t*)0x02, lightThreshold);
         chirp(1);
@@ -423,9 +433,7 @@ int main (void) {
     uint16_t currCapacitance = 0;
     uint16_t lastCapacitance = 0;
 
-
     while(1) {
-
         if(wakeUpCount < maxSleepTimes) {
             sleep();
             wakeUpCount++;
@@ -436,8 +444,7 @@ int main (void) {
             lastCapacitance = currCapacitance;
             currCapacitance = getCapacitance();
             capacitanceDiff = referenceCapacitance - currCapacitance;
-
-           
+            
             if (!playedHappy && ((int16_t)lastCapacitance - (int16_t)currCapacitance) < -5 && lastCapacitance !=0) {
                 chirp(9);
                 _delay_ms(350);
@@ -458,7 +465,6 @@ int main (void) {
                     chirpIfLight();
                     playedHappy = 0;
                 }
-
                 if(capacitanceDiff > -5 && capacitanceDiff < -2) {
                     if(STATE_ALERT != state) {
                         wakeUpInterval8s();
