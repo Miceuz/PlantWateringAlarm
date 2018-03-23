@@ -350,15 +350,15 @@ uint8_t isLightNotCalibrated() {
 uint16_t battFullLSB = 0;
 uint16_t refVoltageLSB = 0;
 
-uint8_t isBatteryEmpty(){
+static inline uint8_t isBatteryEmpty(){
     return refVoltageLSB > battFullLSB && (refVoltageLSB - battFullLSB) > 61;
 }
 
-uint8_t isBatteryLow(){
+static inline uint8_t isBatteryLow(){
     return refVoltageLSB > battFullLSB && (refVoltageLSB - battFullLSB) > 5;
 }
 
-void blinkToSelfdestruct(){
+static inline void blinkToSelfdestruct(){
     wakeUpInterval1s();
     initWatchdog();
     maxSleepTimes = 1;
@@ -370,7 +370,7 @@ void blinkToSelfdestruct(){
     }
 }
 
-void calibrateRefVoltage() {
+static inline void calibrateRefVoltage() {
     _delay_ms(1000); //allow battery voltage to stabilize
     battFullLSB = getRefVoltage();//discard the first reading
     _delay_ms(1000);
@@ -381,14 +381,14 @@ void calibrateRefVoltage() {
     sei();
 }
 
-void calibrateLight() {
+static inline void calibrateLight() {
     lightThreshold = lightCounter - lightCounter / 10;
     eeprom_write_word((uint16_t*)0x02, lightThreshold);
     chirp(1);
     _delay_ms(300);
 }
 
-void sleepTimes(uint16_t times) {
+static inline void sleepTimes(uint16_t times) {
     uint8_t wakeUpCount = 0;
     while (wakeUpCount < times) {
         sleep();
@@ -396,6 +396,13 @@ void sleepTimes(uint16_t times) {
     }
 }
 
+static inline playHappy() {
+    chirp(9);
+    _delay_ms(350);
+    chirp(1);
+    _delay_ms(50);
+    chirp(1);
+}
 
 uint8_t playedHappy = 0;
 
@@ -494,12 +501,8 @@ int main (void) {
     		          
     	if(capacitanceDiff > 10) {
     		if (!playedHappy) {
-    		    chirp(9);
-    		    _delay_ms(350);
-    		    chirp(1);
-    		    _delay_ms(50);
-    		    chirp(1);
-    		    playedHappy = 1;
+                playHappy();
+                playedHappy = 1;
     		}
     		if(STATE_HIBERNATE != state) {
     		    wakeUpInterval8s();
