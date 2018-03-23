@@ -370,6 +370,40 @@ void blinkToSelfdestruct(){
     }
 }
 
+void calibrateRefVoltage() {
+    _delay_ms(1000); //allow battery voltage to stabilize
+    battFullLSB = getRefVoltage();//discard the first reading
+    _delay_ms(1000);
+    battFullLSB = getRefVoltage();
+    ledOff();
+    cli();
+    eeprom_write_word((uint16_t*)0x04, battFullLSB);
+    sei();
+}
+
+void calibrateLight() {
+    lightThreshold = lightCounter - lightCounter / 10;
+    eeprom_write_word((uint16_t*)0x02, lightThreshold);
+    chirp(1);
+    _delay_ms(300);
+}
+
+void sleepTimes(uint16_t times) {
+    uint8_t wakeUpCount = 0;
+    while (wakeUpCount < times) {
+        sleep();
+        wakeUpCount++;
+    }
+}
+
+
+uint8_t playedHappy = 0;
+
+uint8_t state = STATE_PANIC;
+int16_t capacitanceDiff = 0;
+uint16_t currCapacitance = 0;
+uint16_t lastCapacitance = 0;
+
 int main (void) {
 	setupGPIO();
 
@@ -389,19 +423,11 @@ int main (void) {
     CLKPR = _BV(CLKPCE);
     CLKPR = _BV(CLKPS1); //clock speed = clk/4 = 2Mhz
 
-
     adcOn();
     ledOn();
 
     if(65535 == battFullLSB) {
-        _delay_ms(1000); //allow battery voltage to stabilize
-        battFullLSB = getRefVoltage();//discard the first reading
-        _delay_ms(1000);
-        battFullLSB = getRefVoltage();
-        ledOff();
-        cli();
-        eeprom_write_word((uint16_t*)0x04, battFullLSB);
-        sei();
+        calibrateRefVoltage();
     } else {
         getRefVoltage(); //allow battery voltage to stabilize
         _delay_ms(1000);
@@ -419,10 +445,7 @@ int main (void) {
 
     getLight();
     if(isLightNotCalibrated()) {
-        lightThreshold = lightCounter - lightCounter / 10;
-        eeprom_write_word((uint16_t*)0x02, lightThreshold);
-        chirp(1);
-        _delay_ms(300);
+        calibrateLight();
     }
     chirp(2);
 
@@ -435,79 +458,68 @@ int main (void) {
     setupPowerSaving();
     initWatchdog();
 
-    uint8_t wakeUpCount = 0;
-    uint8_t playedHappy = 0;
-    
-    uint8_t state = STATE_PANIC;
-    int16_t capacitanceDiff = 0;
-    uint16_t currCapacitance = 0;
-    uint16_t lastCapacitance = 0;
-
-    dbg_tx_init();
 
     uint16_t referenceCapacitance = getCapacitance(isBatteryLow());
 
+    dbg_tx_init();
     dbg_putchar(referenceCapacitance >> 8);
     dbg_putchar(referenceCapacitance & 0x00FF);
+
     while(1) {
-        if(wakeUpCount < maxSleepTimes) {
-            sleep();
-            wakeUpCount++;
+
+        sleepTimes(maxSleepTimes);
+
+        secondsAfterWatering = maxSleepTimes * sleepSeconds;
+        lastCapacitance = currCapacitance;
+
+        adcOn();
+        refVoltageLSB = getRefVoltage();
+        currCapacitance = getCapacitance(isBatteryLow());
+        adcOff();
+
+        dbg_putchar(currCapacitance >> 8);
+        dbg_putchar(currCapacitance & 0x00FF);
+
+        capacitanceDiff = (int16_t)currCapacitance - (int16_t)referenceCapacitance;
+                             
+        if(capacitanceDiff > 10) {
+            if (!playedHappy) {
+                chirp(9);
+                _delay_ms(350);
+                chirp(1);
+                _delay_ms(50);
+                chirp(1);
+                playedHappy = 1;
+            }
+            if(STATE_HIBERNATE != state) {
+                wakeUpInterval8s();
+            }
+            maxSleepTimes = SLEEP_TIMES_HIBERNATE;
+            state = STATE_HIBERNATE;
         } else {
-            wakeUpCount = 0;
-            secondsAfterWatering = maxSleepTimes * sleepSeconds;
+            if(capacitanceDiff <= 10) {
+                chirpIfLight();
+                playedHappy = 0;
+            }
 
-            lastCapacitance = currCapacitance;
-
-            adcOn();
-            refVoltageLSB = getRefVoltage();
-            currCapacitance = getCapacitance(isBatteryLow());
-            adcOff();
-
-            capacitanceDiff = (int16_t)currCapacitance - (int16_t)referenceCapacitance;
-
-            dbg_putchar(currCapacitance >> 8);
-            dbg_putchar(currCapacitance & 0x00FF);
-                                  
-            if(capacitanceDiff > 10) {
-                if (!playedHappy) {
-                    chirp(9);
-                    _delay_ms(350);
-                    chirp(1);
-                    _delay_ms(50);
-                    chirp(1);
-                    playedHappy = 1;
-                }
-                if(STATE_HIBERNATE != state) {
+            if(capacitanceDiff >=5  && capacitanceDiff < 10) {
+                if(STATE_ALERT != state) {
                     wakeUpInterval8s();
                 }
-                maxSleepTimes = SLEEP_TIMES_HIBERNATE;
-                state = STATE_HIBERNATE;
-            } else {
-                if(capacitanceDiff <= 10) {
-                    chirpIfLight();
-                    playedHappy = 0;
+                maxSleepTimes = SLEEP_TIMES_ALERT;
+                state = STATE_ALERT;
+            } else if(capacitanceDiff > 2 && capacitanceDiff < 5) {
+                if(STATE_VERY_ALERT != state) {
+                    wakeUpInterval8s();
                 }
-
-                if(capacitanceDiff >=5  && capacitanceDiff < 10) {
-                    if(STATE_ALERT != state) {
-                        wakeUpInterval8s();
-                    }
-                    maxSleepTimes = SLEEP_TIMES_ALERT;
-                    state = STATE_ALERT;
-                } else if(capacitanceDiff > 2 && capacitanceDiff < 5) {
-                    if(STATE_VERY_ALERT != state) {
-                        wakeUpInterval8s();
-                    }
-                    state = STATE_VERY_ALERT;
-                    maxSleepTimes = SLEEP_TIMES_VERY_ALERT;
-                } else if(capacitanceDiff <= 2) {
-                    if(STATE_PANIC != state) {
-                        wakeUpInterval1s();
-                    }
-                    state = STATE_PANIC;
-                    maxSleepTimes = SLEEP_TIMES_PANIC;
+                state = STATE_VERY_ALERT;
+                maxSleepTimes = SLEEP_TIMES_VERY_ALERT;
+            } else if(capacitanceDiff <= 2) {
+                if(STATE_PANIC != state) {
+                    wakeUpInterval1s();
                 }
+                state = STATE_PANIC;
+                maxSleepTimes = SLEEP_TIMES_PANIC;
             }
         }
     }
