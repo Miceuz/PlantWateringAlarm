@@ -154,7 +154,8 @@ uint16_t getRefVoltage() {
     
     ADCSRA |= _BV(ADSC); //start conversion
     
-    loop_until_bit_is_clear(ADCSRA, ADSC);
+    sleepWhileADC();
+    // loop_until_bit_is_clear(ADCSRA, ADSC);
     
     uint16_t result = ADC;
 
@@ -431,11 +432,19 @@ int main (void) {
 
     uint16_t referenceCapacitance = getCapacitance(isBatteryLow);
 
+    dbg_putchar(referenceCapacitance >> 8);
+    dbg_putchar(referenceCapacitance & 0x00FF);
     while(1) {
         if(wakeUpCount < maxSleepTimes) {
             sleep();
             wakeUpCount++;
         } else {
+
+            refVoltageLSB = getRefVoltage();
+            
+            isBatteryEmpty = refVoltageLSB > battFullLSB && (refVoltageLSB - battFullLSB) > 61;
+            isBatteryLow = refVoltageLSB > battFullLSB && (refVoltageLSB - battFullLSB) > 5;
+
         	secondsAfterWatering = maxSleepTimes * sleepSeconds;
 
             wakeUpCount = 0;
