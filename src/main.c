@@ -147,6 +147,16 @@ uint16_t getADC1() {
     return 1023 - result;
 }
 
+void adcOn() {
+    PRR &= ~_BV(PRADC);  //enable ADC in power reduction
+    ADCSRA |= _BV(ADEN);
+}
+
+void adcOff() {
+    ADCSRA &=~ _BV(ADEN);
+    PRR |= _BV(PRADC);
+}
+
 uint16_t getRefVoltage() {
     ADCSRA |= _BV(ADPS2); //adc clock speed = sysclk/16
     ADCSRA |= _BV(ADIE);
@@ -162,10 +172,7 @@ uint16_t getRefVoltage() {
     return result;//reference * 1023 / result;
 }
 
-uint16_t getCapacitance(uint8_t withStabilizeDelay) {
-    PRR &= ~_BV(PRADC);  //enable ADC in power reduction
-    ADCSRA |= _BV(ADEN);
-    
+uint16_t getCapacitance(uint8_t withStabilizeDelay) {    
     PRR &= ~_BV(PRTIM0);
 	startExcitationSignal();
 
@@ -179,9 +186,6 @@ uint16_t getCapacitance(uint8_t withStabilizeDelay) {
     PORTB &= ~_BV(PB2);
     PRR |= _BV(PRTIM0);
     
-    ADCSRA &=~ _BV(ADEN);
-    PRR |= _BV(PRADC);
-
     return result;
 }
 
@@ -354,7 +358,17 @@ uint8_t isBatteryLow(){
     return refVoltageLSB > battFullLSB && (refVoltageLSB - battFullLSB) > 5;
 }
 
-
+void blinkToSelfdestruct(){
+    wakeUpInterval1s();
+    initWatchdog();
+    maxSleepTimes = 1;
+    while(1) {
+        ledOn();
+        sleep();
+        ledOff();
+        sleep();
+    }
+}
 
 int main (void) {
 	setupGPIO();
@@ -372,15 +386,15 @@ int main (void) {
 
     sei();
 
-    PRR &= ~_BV(PRADC);  //enable ADC in power reduction
-    ADCSRA |= _BV(ADEN);
-
     CLKPR = _BV(CLKPCE);
     CLKPR = _BV(CLKPS1); //clock speed = clk/4 = 2Mhz
 
+
+    adcOn();
+    ledOn();
+
     if(65535 == battFullLSB) {
-        ledOn();
-        _delay_ms(1000);
+        _delay_ms(1000); //allow battery voltage to stabilize
         battFullLSB = getRefVoltage();//discard the first reading
         _delay_ms(1000);
         battFullLSB = getRefVoltage();
@@ -389,22 +403,14 @@ int main (void) {
         eeprom_write_word((uint16_t*)0x04, battFullLSB);
         sei();
     } else {
-        getRefVoltage();
+        getRefVoltage(); //allow battery voltage to stabilize
         _delay_ms(1000);
     }
    
     refVoltageLSB = getRefVoltage();
     
     if(isBatteryEmpty()) {
-        wakeUpInterval1s();
-        initWatchdog();
-        maxSleepTimes = 1;
-        while(1) {
-            ledOn();
-            sleep();
-            ledOff();
-            sleep();
-        }
+        blinkToSelfdestruct();
     }
 
     chirp(2);    
@@ -451,9 +457,13 @@ int main (void) {
             wakeUpCount = 0;
             secondsAfterWatering = maxSleepTimes * sleepSeconds;
 
-            refVoltageLSB = getRefVoltage();
             lastCapacitance = currCapacitance;
+
+            adcOn();
+            refVoltageLSB = getRefVoltage();
             currCapacitance = getCapacitance(isBatteryLow());
+            adcOff();
+
             capacitanceDiff = (int16_t)currCapacitance - (int16_t)referenceCapacitance;
 
             dbg_putchar(currCapacitance >> 8);
