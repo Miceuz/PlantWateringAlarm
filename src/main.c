@@ -15,6 +15,7 @@
 #define LED_K PB0 
 #define LED_A PB1
 
+
 //------------ peripherals ----------------
 
 void inline initBuzzer() {
@@ -121,6 +122,7 @@ void startExcitationSignal() {
 	OCR0A = 0;
 	TCCR0A = _BV(COM0A0) |  //Toggle OC0A on Compare Match
 			_BV(WGM01);
+    TCNT0 = 254;
 	TCCR0B = _BV(CS00);
 }
 
@@ -131,17 +133,16 @@ void stopExcitationSignal() {
 }
 
 uint16_t getADC1() {
-    ADCSRA |= _BV(ADPS2); //adc clock speed = sysclk/16
+    ADCSRA = _BV(ADEN) | _BV(ADPS2); //adc clock speed = sysclk/16
     ADCSRA |= _BV(ADIE);
-    ADMUX == _BV(MUX0); //select ADC1 as input
+    ADMUX = _BV(MUX0); //select ADC1 as input
     
     ADCSRA |= _BV(ADSC); //start conversion
     
     // sleepWhileADC();
     loop_until_bit_is_clear(ADCSRA, ADSC);
 
-    uint16_t result = ADCL;
-    result |= ADCH << 8;
+    uint16_t result = ADC;
     
     return 1023 - result;
 }
@@ -153,25 +154,24 @@ uint16_t getRefVoltage() {
     
     ADCSRA |= _BV(ADSC); //start conversion
     
-    sleepWhileADC();
+    loop_until_bit_is_clear(ADCSRA, ADSC);
     
-    uint16_t result = ADCL;
-    result |= ADCH << 8;
-    
+    uint16_t result = ADC;
 
     return result;//reference * 1023 / result;
 }
 
-uint16_t getCapacitance() {
+uint16_t getCapacitance(uint8_t withStabilizeDelay) {
     PRR &= ~_BV(PRADC);  //enable ADC in power reduction
     ADCSRA |= _BV(ADEN);
     
     PRR &= ~_BV(PRTIM0);
 	startExcitationSignal();
 
-    // _delay_ms(1);
     getADC1();
-    // _delay_ms(1);
+    if(withStabilizeDelay) {
+        _delay_ms(1000);
+    }
     uint16_t result = getADC1();
     
     stopExcitationSignal();
@@ -254,7 +254,7 @@ void loopSensorMode() {
 			uint8_t usiRx = usiTwiReceiveByte();
 			if(0 == usiRx) {
 				ledOn();
-				currCapacitance = getCapacitance();
+				currCapacitance = getCapacitance(false);
 			    usiTwiTransmitByte(currCapacitance >> 8);
 				usiTwiTransmitByte(currCapacitance &0x00FF);
 				ledOff();
@@ -299,6 +299,9 @@ void loopSensorMode() {
 uint8_t mode;
 uint8_t sleepSeconds = 0;
 uint32_t secondsAfterWatering = 0;
+uint8_t isBatteryEmpty = 0;
+uint8_t isBatteryLow = 0;
+uint8_t maxSleepTimes = 0;
 
 /**
  * Sets wake up interval to 8s
@@ -337,37 +340,36 @@ uint8_t isLightNotCalibrated() {
     return 65535 == lightThreshold;
 }
 
-uint8_t isBatteryEmpty = 0;
 //-----------------------------------------------------------------
 
+#include "dbg_putchar.h"
 int main (void) {
 	setupGPIO();
 
+    cli();
 	uint8_t address = eeprom_read_byte((uint8_t*)0x01);
+    lightThreshold = eeprom_read_word((uint16_t*)0x02);
+    uint16_t battFullLSB = eeprom_read_word((uint16_t*) 0x04);  
+
     if(0 == address || 255 == address) {
     	address = 0x20;
     }
 
     usiTwiSlaveInit(address);
 
-    cli();
-    lightThreshold = eeprom_read_word((uint16_t*)0x02);
-
-    uint16_t battFullLSB = eeprom_read_word((uint16_t*) 0x04);  
     sei();
 
     PRR &= ~_BV(PRADC);  //enable ADC in power reduction
     ADCSRA |= _BV(ADEN);
 
-//    CLKPR = _BV(CLKPCE);
-//    CLKPR = _BV(CLKPS1); //clock speed = clk/4 = 2Mhz
+    CLKPR = _BV(CLKPCE);
+    CLKPR = _BV(CLKPS1); //clock speed = clk/4 = 2Mhz
 
-    sei();
     if(65535 == battFullLSB) {
         ledOn();
-        _delay_ms(8000);
+        _delay_ms(1000);
         battFullLSB = getRefVoltage();//discard the first reading
-        _delay_ms(4000);
+        _delay_ms(1000);
         battFullLSB = getRefVoltage();
         ledOff();
         cli();
@@ -375,36 +377,32 @@ int main (void) {
         sei();
     } else {
         getRefVoltage();
-        _delay_ms(4000);
+        _delay_ms(1000);
     }
-
-
    
     uint16_t refVoltageLSB = getRefVoltage();
-
     
-    ledOn();
-    chirp(2);
-    ledOn();
-    _delay_ms(10);
-    
-    isBatteryEmpty = refVoltageLSB > battFullLSB && (refVoltageLSB - battFullLSB) > 36;
+    isBatteryEmpty = refVoltageLSB > battFullLSB && (refVoltageLSB - battFullLSB) > 61;
+    isBatteryLow = refVoltageLSB > battFullLSB && (refVoltageLSB - battFullLSB) > 5;
 
     if(isBatteryEmpty) {
+        wakeUpInterval1s();
+        initWatchdog();
+        maxSleepTimes = 1;
         while(1) {
-
+            ledOn();
+            sleep();
+            ledOff();
+            sleep();
         }
     }
 
-    CLKPR = _BV(CLKPCE);
-    CLKPR = _BV(CLKPS1); //clock speed = clk/4 = 2Mhz
     chirp(2);    
     ledOff();
     _delay_ms(500);
 
     getLight();
     if(isLightNotCalibrated()) {
-//        getLight();
         lightThreshold = lightCounter - lightCounter / 10;
         eeprom_write_word((uint16_t*)0x02, lightThreshold);
         chirp(1);
@@ -416,12 +414,9 @@ int main (void) {
 		loopSensorMode();
 	}
 
-	uint16_t referenceCapacitance = getCapacitance();
-
     USICR = 0;
 
     setupPowerSaving();
-
     initWatchdog();
 
     uint8_t wakeUpCount = 0;
@@ -429,10 +424,22 @@ int main (void) {
     
     uint8_t state = STATE_PANIC;
     int16_t capacitanceDiff = 0;
-    uint8_t maxSleepTimes = 0;
     uint16_t currCapacitance = 0;
     uint16_t lastCapacitance = 0;
 
+    dbg_tx_init();
+
+    uint16_t referenceCapacitance = getCapacitance(isBatteryLow);
+
+    // while(1) {
+    //     wakeUpInterval1s();
+    //     initWatchdog();
+    //     currCapacitance = getCapacitance(false);
+    //     dbg_putchar(referenceCapacitance & 0x00FF);
+    //     dbg_putchar(currCapacitance & 0x00FF);
+    //     _delay_ms(100);
+    //     sleep();
+    // }
     while(1) {
         if(wakeUpCount < maxSleepTimes) {
             sleep();
@@ -442,9 +449,12 @@ int main (void) {
 
             wakeUpCount = 0;
             lastCapacitance = currCapacitance;
-            currCapacitance = getCapacitance();
+            currCapacitance = getCapacitance(isBatteryLow);
             capacitanceDiff = referenceCapacitance - currCapacitance;
-            
+
+            dbg_putchar(currCapacitance >> 8);
+            dbg_putchar(currCapacitance & 0x00FF);
+          
             if (!playedHappy && ((int16_t)lastCapacitance - (int16_t)currCapacitance) < -5 && lastCapacitance !=0) {
                 chirp(9);
                 _delay_ms(350);
