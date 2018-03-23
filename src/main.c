@@ -185,7 +185,7 @@ uint16_t getCapacitance(uint8_t withStabilizeDelay) {
     stopExcitationSignal();
     PORTB &= ~_BV(PB2);
     PRR |= _BV(PRTIM0);
-    
+
     return result;
 }
 
@@ -389,10 +389,9 @@ int main (void) {
     CLKPR = _BV(CLKPCE);
     CLKPR = _BV(CLKPS1); //clock speed = clk/4 = 2Mhz
 
-
-    adcOn();
     ledOn();
 
+    adcOn();
     if(65535 == battFullLSB) {
         _delay_ms(1000); //allow battery voltage to stabilize
         battFullLSB = getRefVoltage();//discard the first reading
@@ -406,9 +405,9 @@ int main (void) {
         getRefVoltage(); //allow battery voltage to stabilize
         _delay_ms(1000);
     }
-   
     refVoltageLSB = getRefVoltage();
-    
+    adcOff();
+
     if(isBatteryEmpty()) {
         blinkToSelfdestruct();
     }
@@ -432,7 +431,6 @@ int main (void) {
 
     USICR = 0;
 
-    setupPowerSaving();
     initWatchdog();
 
     uint8_t wakeUpCount = 0;
@@ -445,10 +443,11 @@ int main (void) {
 
     dbg_tx_init();
 
-    uint16_t referenceCapacitance = getCapacitance(isBatteryLow());
+    uint16_t referenceCapacitance = 0;
 
     dbg_putchar(referenceCapacitance >> 8);
     dbg_putchar(referenceCapacitance & 0x00FF);
+    setupPowerSaving();
     while(1) {
         if(wakeUpCount < maxSleepTimes) {
             sleep();
@@ -463,11 +462,19 @@ int main (void) {
             refVoltageLSB = getRefVoltage();
             currCapacitance = getCapacitance(isBatteryLow());
             adcOff();
-
+            if(0 == referenceCapacitance) {
+                referenceCapacitance = currCapacitance;
+            }
             capacitanceDiff = (int16_t)currCapacitance - (int16_t)referenceCapacitance;
+
+            dbg_putchar(referenceCapacitance >> 8);
+            dbg_putchar(referenceCapacitance & 0x00FF);
 
             dbg_putchar(currCapacitance >> 8);
             dbg_putchar(currCapacitance & 0x00FF);
+
+            dbg_putchar(refVoltageLSB >> 8);
+            dbg_putchar(refVoltageLSB & 0x00FF);
                                   
             if(capacitanceDiff > 10) {
                 if (!playedHappy) {
