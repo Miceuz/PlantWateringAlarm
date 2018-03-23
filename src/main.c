@@ -396,7 +396,7 @@ static inline void sleepTimes(uint16_t times) {
     }
 }
 
-static inline playHappy() {
+static inline void playHappy() {
     chirp(9);
     _delay_ms(350);
     chirp(1);
@@ -496,42 +496,97 @@ int main (void) {
 
     	dbg_putchar(refVoltageLSB >> 8);
     	dbg_putchar(refVoltageLSB & 0x00FF);
-    		          
-    	if(capacitanceDiff > 10) {
-    		if (!playedHappy) {
-                playHappy();
-                playedHappy = 1;
-    		}
-    		if(STATE_HIBERNATE != state) {
-    		    wakeUpInterval8s();
-                maxSleepTimes = SLEEP_TIMES_HIBERNATE;
-                state = STATE_HIBERNATE;
-    		}
-    	} else {
-    		if(capacitanceDiff <= 10) {
-    		    chirpIfLight();
-    		    playedHappy = 0;
-    		}
 
-    		if(capacitanceDiff >=5  && capacitanceDiff < 10) {
-    		    if(STATE_ALERT != state) {
-        			wakeUpInterval8s();
-                    maxSleepTimes = SLEEP_TIMES_ALERT;
-                    state = STATE_ALERT;
-    		    }
-    		} else if(capacitanceDiff > 2 && capacitanceDiff < 5) {
-    		    if(STATE_VERY_ALERT != state) {
+        switch(state) {
+            case STATE_INITIAL:
+                wakeUpInterval1s();
+                state = STATE_PANIC;
+                maxSleepTimes = SLEEP_TIMES_PANIC;
+            break;
+            case STATE_PANIC:
+                if (capacitanceDiff > 10) {
+                    wakeUpInterval8s();
+                    maxSleepTimes = SLEEP_TIMES_HIBERNATE;
+                    state = STATE_HIBERNATE;
+                    playHappy();
+                } else if(capacitanceDiff > 2) {
                     wakeUpInterval8s();
                     state = STATE_VERY_ALERT;
                     maxSleepTimes = SLEEP_TIMES_VERY_ALERT;
-    		    }
-    		} else if(capacitanceDiff <= 2) {
-    		    if(STATE_PANIC != state) {
+                }
+            break;
+            case STATE_VERY_ALERT:
+                if(capacitanceDiff <= 2) {
                     wakeUpInterval1s();
                     state = STATE_PANIC;
                     maxSleepTimes = SLEEP_TIMES_PANIC;
-    		    }
-    		}
-    	}
+                } else if(capacitanceDiff > 5) {
+                    wakeUpInterval8s();
+                    maxSleepTimes = SLEEP_TIMES_ALERT;
+                    state = STATE_ALERT;
+                }
+            break;
+            case STATE_ALERT:
+                if(capacitanceDiff <=5) {
+                    wakeUpInterval8s();
+                    state = STATE_VERY_ALERT;
+                    maxSleepTimes = SLEEP_TIMES_VERY_ALERT;
+                } else if(capacitanceDiff > 10) {
+                    wakeUpInterval8s();
+                    maxSleepTimes = SLEEP_TIMES_HIBERNATE;
+                    state = STATE_HIBERNATE;
+                }
+            break;
+            case STATE_HIBERNATE:
+                if(capacitanceDiff <= 10) {
+                    wakeUpInterval8s();
+                    maxSleepTimes = SLEEP_TIMES_ALERT;
+                    state = STATE_ALERT;
+                }
+            break;
+        }
+
+        if(state != STATE_HIBERNATE) {
+            chirpIfLight();
+        }
+
+    		          
+    	// if(capacitanceDiff > 10) {
+    	// 	if (!playedHappy) {
+     //            playHappy();
+     //            playedHappy = 1;
+    	// 	}
+    	// 	if(STATE_HIBERNATE != state) {
+    	// 	    wakeUpInterval8s();
+     //            maxSleepTimes = SLEEP_TIMES_HIBERNATE;
+     //            state = STATE_HIBERNATE;
+    	// 	}
+    	// } else {
+    	// 	if(capacitanceDiff <= 10) {
+    	// 	    chirpIfLight();
+    	// 	    playedHappy = 0;
+    	// 	}
+
+
+    	// 	if(capacitanceDiff >=5  && capacitanceDiff < 10) {
+    	// 	    if(STATE_ALERT != state) {
+     //    			wakeUpInterval8s();
+     //                maxSleepTimes = SLEEP_TIMES_ALERT;
+     //                state = STATE_ALERT;
+    	// 	    }
+    	// 	} else if(capacitanceDiff > 2 && capacitanceDiff < 5) {
+    	// 	    if(STATE_VERY_ALERT != state) {
+     //                wakeUpInterval8s();
+     //                state = STATE_VERY_ALERT;
+     //                maxSleepTimes = SLEEP_TIMES_VERY_ALERT;
+    	// 	    }
+    	// 	} else if(capacitanceDiff <= 2) {
+    	// 	    if(STATE_PANIC != state) {
+     //                wakeUpInterval1s();
+     //                state = STATE_PANIC;
+     //                maxSleepTimes = SLEEP_TIMES_PANIC;
+    	// 	    }
+    	// 	}
+    	// }
     }
 }
