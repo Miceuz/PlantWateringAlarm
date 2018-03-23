@@ -288,9 +288,9 @@ void loopSensorMode() {
 #define STATE_PANIC 4
 #define STATE_MEASURE 5
 
-#define SLEEP_TIMES_HIBERNATE 225
+#define SLEEP_TIMES_HIBERNATE 450
 #define SLEEP_TIMES_ALERT 37
-#define SLEEP_TIMES_VERY_ALERT 1
+#define SLEEP_TIMES_VERY_ALERT 2
 #define SLEEP_TIMES_PANIC 1
 
 #define MODE_SENSOR 0
@@ -301,7 +301,7 @@ uint8_t sleepSeconds = 0;
 uint32_t secondsAfterWatering = 0;
 uint8_t isBatteryEmpty = 0;
 uint8_t isBatteryLow = 0;
-uint8_t maxSleepTimes = 0;
+uint16_t maxSleepTimes = 0;
 
 /**
  * Sets wake up interval to 8s
@@ -431,15 +431,6 @@ int main (void) {
 
     uint16_t referenceCapacitance = getCapacitance(isBatteryLow);
 
-    // while(1) {
-    //     wakeUpInterval1s();
-    //     initWatchdog();
-    //     currCapacitance = getCapacitance(false);
-    //     dbg_putchar(referenceCapacitance & 0x00FF);
-    //     dbg_putchar(currCapacitance & 0x00FF);
-    //     _delay_ms(100);
-    //     sleep();
-    // }
     while(1) {
         if(wakeUpCount < maxSleepTimes) {
             sleep();
@@ -450,44 +441,44 @@ int main (void) {
             wakeUpCount = 0;
             lastCapacitance = currCapacitance;
             currCapacitance = getCapacitance(isBatteryLow);
-            capacitanceDiff = referenceCapacitance - currCapacitance;
+            capacitanceDiff = (int16_t)currCapacitance - (int16_t)referenceCapacitance;
 
             dbg_putchar(currCapacitance >> 8);
             dbg_putchar(currCapacitance & 0x00FF);
-          
-            if (!playedHappy && ((int16_t)lastCapacitance - (int16_t)currCapacitance) < -5 && lastCapacitance !=0) {
-                chirp(9);
-                _delay_ms(350);
-                chirp(1);
-                _delay_ms(50);
-                chirp(1);
-                playedHappy = 1;
-            }
-                        
-            if(capacitanceDiff <= -5) {
+                                  
+            if(capacitanceDiff > 10) {
+                if (!playedHappy) {
+                    chirp(9);
+                    _delay_ms(350);
+                    chirp(1);
+                    _delay_ms(50);
+                    chirp(1);
+                    playedHappy = 1;
+                }
                 if(STATE_HIBERNATE != state) {
                     wakeUpInterval8s();
                 }
                 maxSleepTimes = SLEEP_TIMES_HIBERNATE;
                 state = STATE_HIBERNATE;
             } else {
-                if(capacitanceDiff >= -5) {
+                if(capacitanceDiff <= 10) {
                     chirpIfLight();
                     playedHappy = 0;
                 }
-                if(capacitanceDiff > -5 && capacitanceDiff < -2) {
+
+                if(capacitanceDiff >=5  && capacitanceDiff < 10) {
                     if(STATE_ALERT != state) {
                         wakeUpInterval8s();
                     }
                     maxSleepTimes = SLEEP_TIMES_ALERT;
                     state = STATE_ALERT;
-                } else if(capacitanceDiff >= -2 && capacitanceDiff < 0) {
+                } else if(capacitanceDiff > 2 && capacitanceDiff < 5) {
                     if(STATE_VERY_ALERT != state) {
                         wakeUpInterval8s();
                     }
                     state = STATE_VERY_ALERT;
                     maxSleepTimes = SLEEP_TIMES_VERY_ALERT;
-                } else if(capacitanceDiff >= 0) {
+                } else if(capacitanceDiff <= 2) {
                     if(STATE_PANIC != state) {
                         wakeUpInterval1s();
                     }
