@@ -300,8 +300,6 @@ void loopSensorMode() {
 uint8_t mode;
 uint8_t sleepSeconds = 0;
 uint32_t secondsAfterWatering = 0;
-uint8_t isBatteryEmpty = 0;
-uint8_t isBatteryLow = 0;
 uint16_t maxSleepTimes = 0;
 
 /**
@@ -344,13 +342,27 @@ uint8_t isLightNotCalibrated() {
 //-----------------------------------------------------------------
 
 #include "dbg_putchar.h"
+
+uint16_t battFullLSB = 0;
+uint16_t refVoltageLSB = 0;
+
+uint8_t isBatteryEmpty(){
+    return refVoltageLSB > battFullLSB && (refVoltageLSB - battFullLSB) > 61;
+}
+
+uint8_t isBatteryLow(){
+    return refVoltageLSB > battFullLSB && (refVoltageLSB - battFullLSB) > 5;
+}
+
+
+
 int main (void) {
 	setupGPIO();
 
     cli();
 	uint8_t address = eeprom_read_byte((uint8_t*)0x01);
     lightThreshold = eeprom_read_word((uint16_t*)0x02);
-    uint16_t battFullLSB = eeprom_read_word((uint16_t*) 0x04);  
+    battFullLSB = eeprom_read_word((uint16_t*) 0x04);  
 
     if(0 == address || 255 == address) {
     	address = 0x20;
@@ -381,12 +393,9 @@ int main (void) {
         _delay_ms(1000);
     }
    
-    uint16_t refVoltageLSB = getRefVoltage();
+    refVoltageLSB = getRefVoltage();
     
-    isBatteryEmpty = refVoltageLSB > battFullLSB && (refVoltageLSB - battFullLSB) > 61;
-    isBatteryLow = refVoltageLSB > battFullLSB && (refVoltageLSB - battFullLSB) > 5;
-
-    if(isBatteryEmpty) {
+    if(isBatteryEmpty()) {
         wakeUpInterval1s();
         initWatchdog();
         maxSleepTimes = 1;
@@ -430,7 +439,7 @@ int main (void) {
 
     dbg_tx_init();
 
-    uint16_t referenceCapacitance = getCapacitance(isBatteryLow);
+    uint16_t referenceCapacitance = getCapacitance(isBatteryLow());
 
     dbg_putchar(referenceCapacitance >> 8);
     dbg_putchar(referenceCapacitance & 0x00FF);
@@ -439,17 +448,12 @@ int main (void) {
             sleep();
             wakeUpCount++;
         } else {
+            wakeUpCount = 0;
+            secondsAfterWatering = maxSleepTimes * sleepSeconds;
 
             refVoltageLSB = getRefVoltage();
-            
-            isBatteryEmpty = refVoltageLSB > battFullLSB && (refVoltageLSB - battFullLSB) > 61;
-            isBatteryLow = refVoltageLSB > battFullLSB && (refVoltageLSB - battFullLSB) > 5;
-
-        	secondsAfterWatering = maxSleepTimes * sleepSeconds;
-
-            wakeUpCount = 0;
             lastCapacitance = currCapacitance;
-            currCapacitance = getCapacitance(isBatteryLow);
+            currCapacitance = getCapacitance(isBatteryLow());
             capacitanceDiff = (int16_t)currCapacitance - (int16_t)referenceCapacitance;
 
             dbg_putchar(currCapacitance >> 8);
