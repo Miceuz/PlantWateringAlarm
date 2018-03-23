@@ -243,7 +243,7 @@ uint16_t getLight() {
 
 // ----------------- sensor mode loop hack ---------------------
 
-void loopSensorMode() {
+static inline void loopSensorMode() {
     PRR &= ~_BV(PRADC);  //enable ADC in power reduction
     ADCSRA = _BV(ADEN) | _BV(ADPS2);
     ADMUX |= _BV(MUX0); //select ADC1 as input
@@ -309,7 +309,7 @@ uint16_t maxSleepTimes = 0;
 /**
  * Sets wake up interval to 8s
  **/
-void inline wakeUpInterval8s() {
+static inline void wakeUpInterval8s() {
     WDTCSR &= ~_BV(WDP1);
     WDTCSR &= ~_BV(WDP2);
     WDTCSR |= _BV(WDP3) | _BV(WDP0); //every 8 sec
@@ -319,7 +319,7 @@ void inline wakeUpInterval8s() {
 /**
  * Sets wake up interval to 1s
  **/
-void inline wakeUpInterval1s() {
+static inline void wakeUpInterval1s() {
     WDTCSR &= ~_BV(WDP3);
     WDTCSR &= ~_BV(WDP0);
     WDTCSR |= _BV(WDP1) | _BV(WDP2); //every 1 sec
@@ -328,7 +328,7 @@ void inline wakeUpInterval1s() {
 
 uint16_t lightThreshold = 65530;
 
-void inline static chirpIfLight() {
+inline static void chirpIfLight() {
     getLight();
     if(lightCounter < lightThreshold) {
         chirp(3);
@@ -339,7 +339,7 @@ void inline static chirpIfLight() {
     }
 }
 
-uint8_t isLightNotCalibrated() {
+static inline uint8_t isLightNotCalibrated() {
     return 65535 == lightThreshold;
 }
 
@@ -405,8 +405,7 @@ static inline playHappy() {
 }
 
 uint8_t playedHappy = 0;
-
-uint8_t state = STATE_PANIC;
+uint8_t state = STATE_INITIAL;
 int16_t capacitanceDiff = 0;
 uint16_t currCapacitance = 0;
 uint16_t lastCapacitance = 0;
@@ -466,7 +465,6 @@ int main (void) {
     setupPowerSaving();
     initWatchdog();
 
-
     dbg_tx_init();
 
     uint16_t referenceCapacitance = 0;
@@ -506,9 +504,9 @@ int main (void) {
     		}
     		if(STATE_HIBERNATE != state) {
     		    wakeUpInterval8s();
+                maxSleepTimes = SLEEP_TIMES_HIBERNATE;
+                state = STATE_HIBERNATE;
     		}
-    		maxSleepTimes = SLEEP_TIMES_HIBERNATE;
-    		state = STATE_HIBERNATE;
     	} else {
     		if(capacitanceDiff <= 10) {
     		    chirpIfLight();
@@ -518,21 +516,21 @@ int main (void) {
     		if(capacitanceDiff >=5  && capacitanceDiff < 10) {
     		    if(STATE_ALERT != state) {
         			wakeUpInterval8s();
+                    maxSleepTimes = SLEEP_TIMES_ALERT;
+                    state = STATE_ALERT;
     		    }
-    		    maxSleepTimes = SLEEP_TIMES_ALERT;
-    		    state = STATE_ALERT;
     		} else if(capacitanceDiff > 2 && capacitanceDiff < 5) {
     		    if(STATE_VERY_ALERT != state) {
                     wakeUpInterval8s();
+                    state = STATE_VERY_ALERT;
+                    maxSleepTimes = SLEEP_TIMES_VERY_ALERT;
     		    }
-    		    state = STATE_VERY_ALERT;
-    		    maxSleepTimes = SLEEP_TIMES_VERY_ALERT;
     		} else if(capacitanceDiff <= 2) {
     		    if(STATE_PANIC != state) {
                     wakeUpInterval1s();
+                    state = STATE_PANIC;
+                    maxSleepTimes = SLEEP_TIMES_PANIC;
     		    }
-    		    state = STATE_PANIC;
-    		    maxSleepTimes = SLEEP_TIMES_PANIC;
     		}
     	}
     }
