@@ -1,0 +1,19 @@
+G04 #@! TF.GenerationSoftware,KiCad,Pcbnew,5.0.0-rc2-dev-unknown-0ded476~63~ubuntu16.04.1*
+G04 #@! TF.CreationDate,2018-03-27T22:27:57+03:00*
+G04 #@! TF.ProjectId,chirp-v2.4,63686972702D76322E342E6B69636164,rev?*
+G04 #@! TF.SameCoordinates,Original*
+G04 #@! TF.FileFunction,Paste,Bot*
+G04 #@! TF.FilePolarity,Positive*
+%FSLAX46Y46*%
+G04 Gerber Fmt 4.6, Leading zero omitted, Abs format (unit mm)*
+G04 Created by KiCad (PCBNEW 5.0.0-rc2-dev-unknown-0ded476~63~ubuntu16.04.1) date Tue Mar 27 22:27:57 2018*
+%MOMM*%
+%LPD*%
+G01*
+G04 APERTURE LIST*
+%ADD10R,2.790000X5.080000*%
+G04 APERTURE END LIST*
+D10*
+X95281100Y-105001100D03*
+X118041100Y-105001100D03*
+M02*

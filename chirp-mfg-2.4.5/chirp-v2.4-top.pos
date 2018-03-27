@@ -1,0 +1,24 @@
+### Module positions - created on Tue Mar 27 22:33:28 2018 ###
+### Printed by Pcbnew version kicad 5.0.0-rc2-dev-unknown-0ded476~63~ubuntu16.04.1
+## Unit = mm, Angle = deg.
+## Side : top
+# Ref     Val                  Package                             PosX       PosY       Rot  Side
+C1        1u                   C_0603_1608Metric               100.8000  -107.4000  270.0000  top
+C2        1u                   C_0603_1608Metric               106.8261  -107.5411  180.0000  top
+C3        1u                   C_0603_1608Metric               106.8000  -102.9000  180.0000  top
+C4        1n                   C_0603_1608Metric               120.5500  -100.0500    0.0000  top
+C5        1u                   C_0603_1608Metric                89.8000  -100.8000   90.0000  top
+D1        D                    Diode-SMA_Standard               98.4500  -101.8000  180.0000  top
+D2        DIODE-SCHOTTKY_      SOD-523                         120.5500  -101.6000   90.0000  top
+IC1       TINY24/44/84-SSU     SOIC-14_3.9x8.7mm_Pitch1.27mm   113.1000  -105.0000   90.0000  top
+LED1      LEDCHIPLED_0805      CHIPLED_0805                    107.2261  -110.0811   90.0000  top
+Q1        MOSFET-N-SOT23       SOT-23                           92.0000  -107.5500  180.0000  top
+R1        10K                  R_0603_1608Metric               120.5611  -104.3661  180.0000  top
+R2        1M                   R_0603_1608Metric               110.9500  -100.1500  180.0000  top
+R3        100R                 R_0603_1608Metric               110.9500  -110.1000    0.0000  top
+R5        10K                  R_0603_1608Metric                95.2500  -108.5500  180.0000  top
+R6        1K                   R_0603_1608Metric                89.4500  -105.0000   90.0000  top
+R7        10K                  R_0603_1608Metric               106.8000  -105.1000  180.0000  top
+SW1       SPST_TACTFSMJSMA     FSMJSMA                          82.4611  -105.0011   90.0000  top
+U1        MCP1700-2502E_SOT23  SOT-23                          103.4000  -107.3000  180.0000  top
+## End

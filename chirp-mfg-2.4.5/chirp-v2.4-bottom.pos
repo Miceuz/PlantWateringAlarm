@@ -1,0 +1,8 @@
+### Module positions - created on Tue Mar 27 22:33:28 2018 ###
+### Printed by Pcbnew version kicad 5.0.0-rc2-dev-unknown-0ded476~63~ubuntu16.04.1
+## Unit = mm, Angle = deg.
+## Side : bottom
+# Ref     Val           Package                PosX       PosY       Rot  Side
+BT1       Battery_Cell  BAT-HLD-001       -106.7911  -105.0011   -0.0000  bottom
+SP1       SPEAKER/PS12  PS12               -87.5411  -105.0011  270.0000  bottom
+## End
