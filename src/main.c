@@ -410,6 +410,13 @@ int16_t capacitanceDiff = 0;
 uint16_t currCapacitance = 0;
 uint16_t lastCapacitance = 0;
 
+
+static inline void enterHibernate() {
+    wakeUpInterval8s();
+    maxSleepTimes = SLEEP_TIMES_HIBERNATE;
+    state = STATE_HIBERNATE;
+}
+
 int main (void) {
 	setupGPIO();
 
@@ -482,6 +489,7 @@ int main (void) {
     	refVoltageLSB = getRefVoltage();
     	currCapacitance = getCapacitance(isBatteryLow());
     	adcOff();
+
     	if(0 == referenceCapacitance) {
         	referenceCapacitance = currCapacitance;
     	}
@@ -497,6 +505,8 @@ int main (void) {
     	dbg_putchar(refVoltageLSB >> 8);
     	dbg_putchar(refVoltageLSB & 0x00FF);
 
+        dbg_putchar(state);
+
         switch(state) {
             case STATE_INITIAL:
                 wakeUpInterval1s();
@@ -505,10 +515,8 @@ int main (void) {
             break;
             case STATE_PANIC:
                 if (capacitanceDiff > 10) {
-                    wakeUpInterval8s();
-                    maxSleepTimes = SLEEP_TIMES_HIBERNATE;
-                    state = STATE_HIBERNATE;
                     playHappy();
+                    enterHibernate();
                 } else if(capacitanceDiff > 2) {
                     wakeUpInterval8s();
                     state = STATE_VERY_ALERT;
@@ -516,7 +524,10 @@ int main (void) {
                 }
             break;
             case STATE_VERY_ALERT:
-                if(capacitanceDiff <= 2) {
+                if (capacitanceDiff > 10) {
+                    playHappy();
+                    enterHibernate();
+                } else if(capacitanceDiff <= 2) {
                     wakeUpInterval1s();
                     state = STATE_PANIC;
                     maxSleepTimes = SLEEP_TIMES_PANIC;
@@ -527,14 +538,16 @@ int main (void) {
                 }
             break;
             case STATE_ALERT:
+                if(capacitanceDiff > 20) {
+                    playHappy();
+                }
+
                 if(capacitanceDiff <=5) {
                     wakeUpInterval8s();
                     state = STATE_VERY_ALERT;
                     maxSleepTimes = SLEEP_TIMES_VERY_ALERT;
                 } else if(capacitanceDiff > 10) {
-                    wakeUpInterval8s();
-                    maxSleepTimes = SLEEP_TIMES_HIBERNATE;
-                    state = STATE_HIBERNATE;
+                    enterHibernate();
                 }
             break;
             case STATE_HIBERNATE:
