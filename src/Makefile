@@ -13,11 +13,11 @@ FUSE_L  = 0xE2# see below for fuse values for particular devices
 FUSE_H  = 0xDE
 AVRDUDE = avrdude -c usbasp -P usb -p $(DEVICE) # edit this line for your programmer
 
-CFLAGS  = -Iusbdrv -I. -DDEBUG_LEVEL=0  -Os 
+CFLAGS  = -std=gnu99 -Iusbdrv -I. -DDEBUG_LEVEL=0  -Os 
 CFLAGS += -ffunction-sections -fdata-sections -save-temps 
 LDFLAGS += -Wl,--gc-sections,--relax
 
-OBJECTS = main.o usiTwiSlave.o
+OBJECTS = main.o usiTwiSlave.o dbg_putchar.o
 
 COMPILE = avr-gcc -DF_CPU=$(F_CPU) $(CFLAGS) $(LDFLAGS) -mmcu=$(DEVICE)  
 
