@@ -242,7 +242,7 @@ void loopSensorMode() {
 				ledOff();
 			} else if(0x01 == usiRx) {
 				uint8_t newAddress = usiTwiReceiveByte();
-				if(newAddress > 0 && newAddress < 255) {
+				if(newAddress > 0 && newAddress <= 127) {
 					eeprom_write_byte((uint8_t*)0x01, newAddress);
 				}
 			} else if(0x02 == usiRx) {
