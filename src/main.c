@@ -242,7 +242,10 @@ void loopSensorMode() {
 				ledOff();
 			} else if(0x01 == usiRx) {
 				uint8_t newAddress = usiTwiReceiveByte();
-				if(newAddress > 0 && newAddress < 255) {
+				// 1st bit is reserved for protocol.
+				// Several addresses in the 7-bit range are reserved
+				// https://www.nxp.com/docs/en/user-guide/UM10204.pdf
+				if(newAddress >= 8 && newAddress <= 123) {
 					eeprom_write_byte((uint8_t*)0x01, newAddress);
 				}
 			} else if(0x02 == usiRx) {
