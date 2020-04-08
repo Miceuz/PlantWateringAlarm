@@ -136,7 +136,7 @@ uint16_t getADC1() {
     ADCSRA = _BV(ADEN) | _BV(ADPS2); //adc clock speed = sysclk/16
     ADCSRA |= _BV(ADIE);
     ADMUX = _BV(MUX0); //select ADC1 as input
-    
+    _delay_ms(2);
     ADCSRA |= _BV(ADSC); //start conversion
     
     // sleepWhileADC();
@@ -162,6 +162,8 @@ uint16_t getRefVoltage() {
     ADCSRA |= _BV(ADIE);
     ADMUX = 0b00100001; //select 1,1V reference as input
     
+    _delay_ms(2);
+
     ADCSRA |= _BV(ADSC); //start conversion
     
     sleepWhileADC();
@@ -331,11 +333,13 @@ uint16_t lightThreshold = 65530;
 inline static void chirpIfLight() {
     getLight();
     if(lightCounter < lightThreshold) {
+        dbg_puts("0 ");
         chirp(3);
     } else {
         ledOn();
         _delay_ms(10);
         ledOff();
+        dbg_puts("1 ");
     }
 }
 
@@ -389,7 +393,7 @@ static inline void calibrateLight() {
 }
 
 static inline void sleepTimes(uint16_t times) {
-    uint8_t wakeUpCount = 0;
+    uint16_t wakeUpCount = 0;
     while (wakeUpCount < times) {
         sleep();
         wakeUpCount++;
@@ -402,6 +406,7 @@ static inline void playHappy() {
     chirp(1);
     _delay_ms(50);
     chirp(1);
+    dbg_puts("3 ");
 }
 
 uint8_t playedHappy = 0;
@@ -476,8 +481,10 @@ int main (void) {
 
     uint16_t referenceCapacitance = 0;
 
-    dbg_putchar(referenceCapacitance >> 8);
-    dbg_putchar(referenceCapacitance & 0x00FF);
+    // dbg_putint(referenceCapacitance);
+
+    dbg_putchar(10);
+    dbg_putchar(13);
 
     while(1) {
 
@@ -496,22 +503,14 @@ int main (void) {
     
     	capacitanceDiff = (int16_t)currCapacitance - (int16_t)referenceCapacitance;
 
-    	dbg_putchar(referenceCapacitance >> 8);
-    	dbg_putchar(referenceCapacitance & 0x00FF);
-
-    	dbg_putchar(currCapacitance >> 8);
-    	dbg_putchar(currCapacitance & 0x00FF);
-
-    	dbg_putchar(refVoltageLSB >> 8);
-    	dbg_putchar(refVoltageLSB & 0x00FF);
-
-        dbg_putchar(state);
-
         switch(state) {
             case STATE_INITIAL:
                 wakeUpInterval1s();
-                state = STATE_PANIC;
-                maxSleepTimes = SLEEP_TIMES_PANIC;
+                maxSleepTimes = SLEEP_TIMES_VERY_ALERT;
+                if (capacitanceDiff > 50) {
+                    playHappy();
+                    enterHibernate();
+                }
             break;
             case STATE_PANIC:
                 if (capacitanceDiff > 10) {
@@ -563,43 +562,20 @@ int main (void) {
             chirpIfLight();
         }
 
-    		          
-    	// if(capacitanceDiff > 10) {
-    	// 	if (!playedHappy) {
-     //            playHappy();
-     //            playedHappy = 1;
-    	// 	}
-    	// 	if(STATE_HIBERNATE != state) {
-    	// 	    wakeUpInterval8s();
-     //            maxSleepTimes = SLEEP_TIMES_HIBERNATE;
-     //            state = STATE_HIBERNATE;
-    	// 	}
-    	// } else {
-    	// 	if(capacitanceDiff <= 10) {
-    	// 	    chirpIfLight();
-    	// 	    playedHappy = 0;
-    	// 	}
+        dbg_putint(referenceCapacitance);
+        dbg_putchar(' ');
 
+        dbg_putint(currCapacitance);
+        dbg_putchar(' ');
 
-    	// 	if(capacitanceDiff >=5  && capacitanceDiff < 10) {
-    	// 	    if(STATE_ALERT != state) {
-     //    			wakeUpInterval8s();
-     //                maxSleepTimes = SLEEP_TIMES_ALERT;
-     //                state = STATE_ALERT;
-    	// 	    }
-    	// 	} else if(capacitanceDiff > 2 && capacitanceDiff < 5) {
-    	// 	    if(STATE_VERY_ALERT != state) {
-     //                wakeUpInterval8s();
-     //                state = STATE_VERY_ALERT;
-     //                maxSleepTimes = SLEEP_TIMES_VERY_ALERT;
-    	// 	    }
-    	// 	} else if(capacitanceDiff <= 2) {
-    	// 	    if(STATE_PANIC != state) {
-     //                wakeUpInterval1s();
-     //                state = STATE_PANIC;
-     //                maxSleepTimes = SLEEP_TIMES_PANIC;
-    	// 	    }
-    	// 	}
-    	// }
+        dbg_putint(battFullLSB);
+        dbg_putchar(' ');
+
+        dbg_putint(refVoltageLSB);
+        dbg_putchar(' ');
+
+        dbg_putint(state);
+        
+        dbg_putchar(10);    		          
     }
 }

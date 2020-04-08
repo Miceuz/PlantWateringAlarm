@@ -16,6 +16,24 @@
 
 #if DBG_UART_ENABLE
 
+void dbg_puts(char *s) {
+	while(s && *s) {
+		dbg_putchar(*s++);
+	}
+}
+void dbg_putint(uint16_t i) {
+	if( i < 10) {
+		dbg_putchar('0' + i);
+	} else {
+		dbg_putint(i/10);
+		dbg_putchar('0' + i % 10);
+	}
+	// do {
+	// 	dbg_putchar('0' + i % 10);
+	// 	i = i / 10;
+	// } while(i != 0);
+}
+
 void dbg_putchar(uint8_t c)
 {
 #define DBG_UART_TX_NUM_DELAY_CYCLES	((F_CPU/DBG_UART_BAUDRATE-16)/4+1)
