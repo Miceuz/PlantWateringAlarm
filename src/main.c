@@ -6,6 +6,7 @@
 #include <avr/sleep.h>
 #include <avr/eeprom.h>
 #include "usiTwiSlave.h"
+#include "dbg_putchar.h"
 
 #define USI_SCK PA4
 #define USI_MISO PA5
