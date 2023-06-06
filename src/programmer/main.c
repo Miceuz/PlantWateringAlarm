@@ -100,7 +100,7 @@ static inline unsigned char ispEnterProgrammingMode() {
 		ISP_OUT &= ~(1 << ISP_RST); /* RST low */
 		ispDelay();
 	}
-	return 1; /* error: device dosn't answer */
+	return 1; /* error: device doesn't answer */
 }
 
 static inline void ispConnect() {
