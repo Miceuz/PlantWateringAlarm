@@ -70,7 +70,7 @@ void inline setupGPIO() {
     PORTB &= ~_BV(PB0);
     DDRB |= _BV(PB1);   //nothing
     PORTB &= ~_BV(PB1);
-    DDRB |= _BV(PB2);   //sqare wave output
+    DDRB |= _BV(PB2);   //square wave output
     PORTB &= ~_BV(PB2);
 }
 

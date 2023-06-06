@@ -470,7 +470,7 @@ ISR( USI_START_VECTOR )
   // Condition as in Application Note AVR312 because the Stop Condition Flag is
   // going to be set from the last TWI sequence
   while (
-       // SCL his high
+       // SCL is high
        ( PIN_USI & ( 1 << PIN_USI_SCL ) ) &&
        // and SDA is low
        !( ( PIN_USI & ( 1 << PIN_USI_SDA ) ) )
